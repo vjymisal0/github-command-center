@@ -1,6 +1,5 @@
 import './styles.css';
 import { ThemeToggle } from './components/theme-toggle';
-import { ProfileMenu } from './components/profile-menu';
 import { SearchModal } from './components/search-modal';
 
 export const metadata = { title: 'OSS Tracker' };
@@ -31,7 +30,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <div style={{ display: 'flex', gap: '0.65rem', alignItems: 'center' }}>
             <SearchModal />
             <ThemeToggle />
-            <ProfileMenu />
           </div>
         </nav>
         <main>{children}</main>

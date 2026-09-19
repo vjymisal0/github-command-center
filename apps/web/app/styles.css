@@ -639,3 +639,9 @@ h1 {
 }
 
 .notice{border:1px solid var(--line);border-radius:1rem;padding:1rem;margin:1rem 0;background:var(--card)}.notice.success{border-color:#16a34a;color:#15803d;background:#f0fdf4}.notice.danger{border-color:#dc2626;color:#dc2626;background:#fef2f2}.muted-card{opacity:.78}
+.hero-panel{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:1.25rem;margin-bottom:2rem;padding:1.5rem;border:1px solid var(--line);border-radius:var(--radius-xl);background:linear-gradient(135deg,var(--card),var(--pink-bg));box-shadow:var(--shadow-card)}
+.topnav{box-shadow:var(--shadow-subtle)}
+.metric-card:hover,.card:hover,.row:hover{transform:translateY(-1px);border-color:color-mix(in srgb,var(--accent) 35%,var(--line));box-shadow:0 10px 24px rgba(0,0,0,.06)}
+[data-theme="dark"] .notice.success{background:rgba(22,163,74,.12)}
+[data-theme="dark"] .notice.danger{background:rgba(220,38,38,.12)}
+@media(max-width:680px){.hero-panel{padding:1rem}.topnav{gap:.5rem}.topnav a{padding:.3rem .45rem}}

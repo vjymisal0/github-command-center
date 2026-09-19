@@ -23,21 +23,12 @@ export default async function OverviewPage() {
   return (
     <section>
       {/* Overview Heading Area with Subtitle & Sync Button */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'flex-start',
-          flexWrap: 'wrap',
-          gap: '1.25rem',
-          marginBottom: '2rem',
-        }}
-      >
+      <div className="hero-panel">
         <div>
           <p className="eyebrow" style={{ margin: 0, marginBottom: '0.35rem' }}>Overview</p>
           <h1 style={{ margin: 0, marginBottom: '0.35rem' }}>Your GitHub work, simplified.</h1>
           <p style={{ margin: 0, color: 'var(--muted)', fontSize: '0.95rem' }}>
-            Track your pull requests, review requests, and contributions across accounts in one place.
+            Connect GitHub, then track pull requests, reviews, checks, and contributions in one focused inbox.
           </p>
         </div>
 
