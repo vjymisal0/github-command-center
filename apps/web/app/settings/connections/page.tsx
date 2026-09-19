@@ -6,10 +6,10 @@ import { ConnectedAccountsList } from './connected-accounts';
 export default async function ConnectionsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ connected?: string }>;
+  searchParams: Promise<{ connected?: string; disconnected?: string }>;
 }) {
   const connections = await api.connections();
-  const { connected } = await searchParams;
+  const { connected, disconnected } = await searchParams;
 
   const patConnection = connections.data.find(c => c.type.startsWith('PAT'));
   const accountItems = patConnection?.accountItems;
@@ -21,12 +21,20 @@ export default async function ConnectionsPage({
       </PageHeader>
 
       {connected && (
-        <div className="panel" style={{ borderColor: 'var(--accent)', color: 'var(--accent)' }}>
+        <div className="panel" style={{ borderColor: 'var(--accent)', color: 'var(--accent)', background: '#f0fdf4' }}>
           <strong>GitHub account successfully connected and synced!</strong>
         </div>
       )}
 
-      <div className="grid">
+      {disconnected && (
+        <div className="panel" style={{ borderColor: '#dc2626', color: '#dc2626', background: '#fef2f2' }}>
+          <strong>GitHub token disconnected and removed successfully.</strong>
+        </div>
+      )}
+
+      <ConnectedAccountsList accounts={accountItems} />
+
+      <div className="grid" style={{ marginTop: '1.5rem' }}>
         {connections.data.map((connection: any) => (
           <div className="card" key={connection.type}>
             <span>{connection.coverage}</span>
@@ -45,8 +53,6 @@ export default async function ConnectionsPage({
           </div>
         ))}
       </div>
-
-      <ConnectedAccountsList accounts={accountItems} />
 
       <ConnectPatForm />
 

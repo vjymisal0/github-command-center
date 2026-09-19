@@ -70,7 +70,7 @@ export const api = {
     openPullRequests: prs.filter(pr => pr.state === 'Open').length,
     mergedPullRequests: (prs as readonly { state: string }[]).filter(pr => pr.state === 'Merged' || pr.state === 'Closed').length,
     actionItems: prs.reduce((sum, pr) => sum + pr.reasons.length, 0),
-    failingChecks: prs.filter(pr => pr.ci === 'Failing').length,
+    failingChecks: (prs as readonly { ci: string }[]).filter(pr => pr.ci === 'Failing').length,
     repositories: repos.length,
     lastSuccessfulSync: null,
     coverage: 'fixture',

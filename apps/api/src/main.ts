@@ -8,8 +8,10 @@ import { Octokit } from '@octokit/rest';
 import { prs as fixturePrs, repos as fixtureRepos } from '@gcc/shared/fixtures';
 import { classifyActionReasons, type PullRequestFacts } from '@gcc/shared';
 import { encryptCredential, verifyGitHubWebhookSignature } from '@gcc/shared';
-import Fastify, { type FastifyInstance, type FastifyRequest } from 'fastify';
+import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
 import { randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
 import { z } from 'zod';
 
 export interface RepoItem {
@@ -52,6 +54,46 @@ const memoryConnections = new Map<string, StoredConnection[]>();
 let memoryRepos: RepoItem[] = [...fixtureRepos];
 let memoryPrs: PRItem[] = fixturePrs.map(p => ({ ...p, reasons: [...p.reasons] }));
 let totalMergedPrsCount = 0;
+
+const STORE_PATH = join(process.cwd(), '.dev-store.json');
+
+function saveStore() {
+  try {
+    const serializedConnections = Array.from(memoryConnections.entries());
+    const data = {
+      connections: serializedConnections,
+      repos: memoryRepos,
+      prs: memoryPrs,
+      totalMergedPrsCount,
+    };
+    writeFileSync(STORE_PATH, JSON.stringify(data, null, 2), 'utf-8');
+  } catch {}
+}
+
+function loadStore() {
+  try {
+    if (existsSync(STORE_PATH)) {
+      const raw = readFileSync(STORE_PATH, 'utf-8');
+      const data = JSON.parse(raw);
+      if (Array.isArray(data.connections)) {
+        for (const [k, v] of data.connections) {
+          memoryConnections.set(k, v);
+        }
+      }
+      if (Array.isArray(data.repos) && data.repos.length > 0) {
+        memoryRepos = data.repos;
+      }
+      if (Array.isArray(data.prs) && data.prs.length > 0) {
+        memoryPrs = data.prs;
+      }
+      if (typeof data.totalMergedPrsCount === 'number') {
+        totalMergedPrsCount = data.totalMergedPrsCount;
+      }
+    }
+  } catch {}
+}
+
+loadStore();
 
 const listQuery = z.object({
   search: z.string().optional(),
@@ -175,16 +217,26 @@ export async function buildApp(opts: { logger?: boolean } = {}) {
       dbConns = userConns.map(r => ({ type: r.type, status: r.status.toLowerCase(), id: r.id }));
     }
 
+    const accountsList: Array<{ id: string; username: string }> = [];
+    for (const c of userConns) {
+      accountsList.push({ id: c.id, username: c.username ?? 'GitHub User' });
+    }
+    for (const d of dbConns) {
+      if (!accountsList.some(a => a.id === d.id)) {
+        accountsList.push({ id: d.id, username: d.id.replace(/^pat_[^_]+_/, '') || 'GitHub User' });
+      }
+    }
+
     return {
       data: [
         {
           type: 'PAT (Personal Access Token)',
-          status: dbConns.length > 0 ? `${dbConns.length} connected` : 'Not configured',
+          status: Math.max(dbConns.length, accountsList.length) > 0 ? `${Math.max(dbConns.length, accountsList.length)} connected` : 'Not configured',
           coverage: 'Current active mode',
           description: 'Used for polling repositories, pull requests, and checks for connected accounts.',
           webhook: false,
-          accounts: userConns.map(c => `@${c.username ?? 'Account'}`),
-          accountItems: userConns.map(c => ({ id: c.id, username: c.username ?? 'Account' })),
+          accounts: accountsList.map(c => `@${c.username}`),
+          accountItems: accountsList,
         },
         {
           type: 'GitHub App (Optional Webhook Mode)',
@@ -336,8 +388,8 @@ export async function buildApp(opts: { logger?: boolean } = {}) {
     });
 
     // Ingest live records — explicitly purge mock fixtures once real account is synced
-    const fixtureIds = new Set(fixturePrs.map(f => f.id));
-    const fixtureRepoIds = new Set(fixtureRepos.map(f => f.id));
+    const fixtureIds = new Set<string>(fixturePrs.map(f => f.id));
+    const fixtureRepoIds = new Set<string>(fixtureRepos.map(f => f.id));
 
     if (newRepos.length > 0) {
       const liveExisting = memoryRepos.filter(er => !fixtureRepoIds.has(er.id));
@@ -404,32 +456,35 @@ export async function buildApp(opts: { logger?: boolean } = {}) {
         },
       });
     } catch {
-      const list = memoryConnections.get(userId) ?? [];
-      const existing = list.find(c => c.id === connectionId);
-      if (existing) {
-        existing.status = 'ACTIVE';
-        existing.token = token;
-        existing.username = ghUser.login;
-        existing.lastSyncedAt = new Date();
-      } else {
-        list.push({
-          id: connectionId,
-          userId,
-          type: 'PAT',
-          status: 'ACTIVE',
-          username: ghUser.login,
-          token,
-          lastSyncedAt: new Date(),
-        });
-      }
-      memoryConnections.set(userId, list);
+      // Prisma optional fallback
     }
+
+    const list = memoryConnections.get(userId) ?? [];
+    const existing = list.find(c => c.id === connectionId);
+    if (existing) {
+      existing.status = 'ACTIVE';
+      existing.token = token;
+      existing.username = ghUser.login;
+      existing.lastSyncedAt = new Date();
+    } else {
+      list.push({
+        id: connectionId,
+        userId,
+        type: 'PAT',
+        status: 'ACTIVE',
+        username: ghUser.login,
+        token,
+        lastSyncedAt: new Date(),
+      });
+    }
+    memoryConnections.set(userId, list);
 
     try {
       await syncGitHubData(token, { login: ghUser.login, id: ghUser.id }, request.log);
     } catch (err) {
       request.log.warn({ err }, 'Live sync failed during PAT setup');
     }
+    saveStore();
 
     const accept = request.headers.accept ?? '';
     if (accept.includes('text/html')) {
@@ -450,7 +505,9 @@ export async function buildApp(opts: { logger?: boolean } = {}) {
   const deleteConnectionHandler = async (request: FastifyRequest, reply: FastifyReply) => {
     const user = await currentUser(request);
     const userId = user?.id ?? 'memory_admin';
-    const { id } = request.params as { id: string };
+    const params = request.params as { id?: string };
+    const body = (request.body as { id?: string }) ?? {};
+    const id = params.id ?? body.id ?? '';
 
     try {
       await prisma.encryptedCredential.deleteMany({ where: { connectionId: id } });
@@ -471,6 +528,7 @@ export async function buildApp(opts: { logger?: boolean } = {}) {
       memoryPrs.push(...fixturePrs.map(p => ({ ...p, reasons: [...p.reasons] })));
       totalMergedPrsCount = 0;
     }
+    saveStore();
 
     const accept = request.headers.accept ?? '';
     if (accept.includes('text/html')) {
@@ -510,7 +568,7 @@ export async function buildApp(opts: { logger?: boolean } = {}) {
     for (const conn of list) {
       if (conn.token) {
         try {
-          await syncGitHubData(conn.token, { login: conn.username, id: 0 }, request.log);
+          await syncGitHubData(conn.token, { login: conn.username ?? 'unknown', id: 0 }, request.log);
           syncedAccounts++;
         } catch (err) {
           request.log.warn({ err }, 'Failed sync for connection ' + conn.username);

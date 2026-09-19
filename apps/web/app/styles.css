@@ -169,6 +169,18 @@ code, pre, .mono, small, input, select, textarea, button.search, .card strong {
   color: var(--ink) !important;
 }
 
+.button.danger {
+  background: #dc2626 !important;
+  border-color: #dc2626 !important;
+  color: #ffffff !important;
+}
+
+.button.danger:hover {
+  background: #b91c1c !important;
+  border-color: #b91c1c !important;
+  color: #ffffff !important;
+}
+
 main {
   max-width: 1180px;
   margin: 0 auto;
