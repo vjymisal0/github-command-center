@@ -6,7 +6,7 @@
     "dev": "npm run dev -w apps/web",
     "build": "npm run build --workspaces --if-present",
     "typecheck": "tsc -b",
-    "test": "tsx --test packages/shared/src/*.test.ts",
+    "test": "tsx --test packages/shared/src/*.test.ts apps/api/src/*.test.ts",
     "db:generate": "prisma generate --schema packages/database/prisma/schema.prisma",
     "db:migrate": "prisma migrate deploy --schema packages/database/prisma/schema.prisma"
   },

@@ -2,13 +2,70 @@ services:
   postgres:
     image: postgres:17-alpine
     environment:
-      POSTGRES_USER: gcc
-      POSTGRES_PASSWORD: gcc
-      POSTGRES_DB: gcc
-    ports: ["5432:5432"]
-    volumes: ["postgres:/var/lib/postgresql/data"]
+      POSTGRES_USER: ${POSTGRES_USER:-gcc}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gcc}
+      POSTGRES_DB: ${POSTGRES_DB:-gcc}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-gcc}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   redis:
     image: redis:7-alpine
-    ports: ["6379:6379"]
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    ports:
+      - "4000:4000"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-gcc}:${POSTGRES_PASSWORD:-gcc}@postgres:5432/${POSTGRES_DB:-gcc}
+      REDIS_URL: redis://redis:6379
+      SESSION_SECRET: ${SESSION_SECRET:-super-secret-production-key-change-me}
+      CREDENTIAL_ENCRYPTION_KEY: ${CREDENTIAL_ENCRYPTION_KEY:-0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://api:4000
+    depends_on:
+      - api
+
+  worker:
+    build:
+      context: .
+      dockerfile: apps/worker/Dockerfile
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-gcc}:${POSTGRES_PASSWORD:-gcc}@postgres:5432/${POSTGRES_DB:-gcc}
+      REDIS_URL: redis://redis:6379
+      CREDENTIAL_ENCRYPTION_KEY: ${CREDENTIAL_ENCRYPTION_KEY:-0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
 volumes:
   postgres:
