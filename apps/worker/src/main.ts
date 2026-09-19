@@ -1,7 +1,7 @@
 import { Worker, type Job } from 'bullmq';
 import { Octokit } from '@octokit/rest';
 import { PrismaClient } from '@prisma/client';
-import { decryptCredential, classifyActionReasons, type PullRequestFacts } from '@gcc/shared';
+import { decryptCredential, classifyActionReasons, type PullRequestFacts } from '../../../packages/shared/src/index.js';
 
 const prisma = new PrismaClient();
 const connection = { url: process.env.REDIS_URL ?? 'redis://localhost:6379' };
