@@ -16,6 +16,7 @@
     "@gcc/shared": "*",
     "@octokit/rest": "^22.0.1",
     "@prisma/client": "^6.19.3",
+    "dotenv": "^16.6.1",
     "fastify": "^5.1.0",
     "zod": "^3.24.1"
   },
