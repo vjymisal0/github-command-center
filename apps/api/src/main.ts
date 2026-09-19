@@ -769,7 +769,8 @@ export async function buildApp(opts: { logger?: boolean } = {}) {
 }
 
 // Start server when executed directly
-const isMain = process.argv[1] && process.argv[1].replace(/\\/g, '/').endsWith('apps/api/src/main.ts');
+const entrypoint = process.argv[1]?.replace(/\\/g, '/') ?? '';
+const isMain = entrypoint.endsWith('apps/api/src/main.ts') || entrypoint.endsWith('apps/api/dist/main.js');
 if (isMain) {
   const app = await buildApp({ logger: true });
   const port = Number(process.env.PORT ?? 4000);
