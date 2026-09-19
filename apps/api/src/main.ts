@@ -170,6 +170,13 @@ export async function buildApp(opts: { logger?: boolean } = {}) {
     return { userId, connected: (memoryConnections.get(userId) ?? []).length > 0 };
   }
 
+  app.addHook('preHandler', async (request, reply) => {
+    const path = request.url.split('?')[0];
+    const publicRoute = path === '/health' || path === '/auth/login' || path === '/auth/me' || path === '/auth/github' || path === '/auth/github/callback' || path === '/webhooks/github';
+    if (publicRoute) return;
+    if (!(await currentUser(request))) return reply.code(401).send({ error: 'Authentication required' });
+  });
+
   await prisma.user.upsert({
     where: { email: adminEmail },
     update: {},
@@ -563,6 +570,9 @@ export async function buildApp(opts: { logger?: boolean } = {}) {
     if (!tokenJson.access_token) return app.httpErrors.unauthorized(tokenJson.error_description ?? 'GitHub OAuth token exchange failed.');
 
     await connectGitHubToken(userId, tokenJson.access_token, request.log);
+    const sid = randomUUID();
+    memorySessions.set(sid, userId === 'memory_admin' ? adminEmail : userId);
+    reply.setCookie('sid', sid, { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production', path: '/' });
     return reply.redirect(`${process.env.PUBLIC_WEB_URL ?? 'http://localhost:3000'}/settings/connections?connected=true`);
   });
 
