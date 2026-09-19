@@ -1,5 +1,5 @@
 {
-  "name": "github-command-center",
+  "name": "oss-tracker",
   "private": true,
   "workspaces": ["apps/*", "packages/*"],
   "scripts": {

@@ -1,4 +1,4 @@
-# GitHub Command Center
+# OSS Tracker
 
 > Open-source, self-hosted developer command center with an explainable, read-only Action Inbox.
 

@@ -1,6 +1,6 @@
 import './styles.css';
 
-export const metadata = { title: 'GitHub Command Center' };
+export const metadata = { title: 'OSS Tracker' };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -15,7 +15,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body>
         <nav className="topnav" aria-label="Main navigation">
-          <strong><span style={{ color: 'var(--accent)' }}>&gt;_</span> GitHub Command Center</strong>
+          <strong><span style={{ color: 'var(--clay-pink)' }}>&gt;_</span> OSS Tracker</strong>
           <a href="/">Overview</a>
           <a href="/inbox">Inbox</a>
           <a href="/pull-requests">Pull Requests</a>
