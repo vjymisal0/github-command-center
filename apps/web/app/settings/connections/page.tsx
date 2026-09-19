@@ -16,9 +16,14 @@ export default async function ConnectionsPage({
 
   return (
     <section>
-      <PageHeader eyebrow="Settings" title="GitHub connection">
-        <p>{hasAccounts ? 'GitHub is connected. Synced repositories and pull requests are now shown in the dashboard.' : 'No GitHub account is connected yet. Connect with a Personal Access Token now, or configure GitHub OAuth/App sign-in later.'}</p>
-      </PageHeader>
+      <div className="access-hero">
+        <PageHeader eyebrow="Settings" title="GitHub access">
+          <p>{hasAccounts ? 'GitHub is connected. Synced repositories and pull requests are live.' : 'No GitHub account is connected. Choose GitHub sign-in or paste a read-only token to start syncing.'}</p>
+        </PageHeader>
+        <div className={hasAccounts ? 'connection-pill connected' : 'connection-pill'}>
+          <span /> {hasAccounts ? `${accounts.length} connected` : 'Not connected'}
+        </div>
+      </div>
 
       {connected && <div className="notice success"><strong>GitHub account connected and synced.</strong></div>}
       {disconnected && <div className="notice danger"><strong>GitHub account disconnected.</strong></div>}
@@ -26,24 +31,26 @@ export default async function ConnectionsPage({
       <ConnectedAccountsList accounts={accounts} />
 
       {!hasAccounts && (
-        <div className="grid" style={{ marginTop: '1.5rem' }}>
-          <div className="card">
-            <span>Available now</span>
-            <strong>Personal Access Token</strong>
-            <p>Paste a read-only GitHub token below. The API validates it, encrypts it, and starts the first sync.</p>
-          </div>
-          <div className="card muted-card">
-            <span>Not configured</span>
+        <div className="connect-grid">
+          <a className="connect-card primary" href="http://localhost:4000/auth/github">
+            <span>Recommended</span>
             <strong>Sign in with GitHub</strong>
-            <p>Needs a GitHub OAuth/App client ID, secret, callback URL, and webhook secret. Use PAT until those env vars exist.</p>
+            <p>Authorize GitHub in the browser. We use the returned access token to sync your repos and PRs.</p>
+            <em>Continue with GitHub →</em>
+          </a>
+          <div className="connect-card">
+            <span>Manual fallback</span>
+            <strong>Personal Access Token</strong>
+            <p>Use this if OAuth is blocked or you want to connect another GitHub account.</p>
           </div>
         </div>
       )}
 
       <ConnectPatForm />
 
-      <div className="panel">
-        <h2>Required token permissions</h2>
+      <div className="panel permissions-panel">
+        <h2>Required permissions</h2>
+        <p>For PATs, use read-only access where GitHub lets you choose it.</p>
         <ul>{connections.permissionChecklist.map((item: string) => <li key={item}>{item}</li>)}</ul>
       </div>
     </section>

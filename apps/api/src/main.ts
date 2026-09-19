@@ -1,4 +1,10 @@
-import 'dotenv/config';
+import { config } from 'dotenv';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
+
+const rootEnvPath = join(process.cwd(), '.env');
+config({ path: existsSync(rootEnvPath) ? rootEnvPath : join(process.cwd(), '../../.env') });
+
 import cookie from '@fastify/cookie';
 import cors from '@fastify/cors';
 import formbody from '@fastify/formbody';
@@ -11,8 +17,7 @@ import { classifyActionReasons, type PullRequestFacts } from '@gcc/shared';
 import { encryptCredential, verifyGitHubWebhookSignature } from '@gcc/shared';
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
 import { randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { z } from 'zod';
 
 export interface RepoItem {
@@ -123,6 +128,7 @@ export async function buildApp(opts: { logger?: boolean } = {}) {
   const prisma = new PrismaClient();
   const app: FastifyInstance = Fastify({ logger: opts.logger ?? false });
   await app.register(helmet);
+  await app.register(sensible);
   await app.register(formbody);
   await app.register(cookie, { secret: process.env.SESSION_SECRET ?? 'dev-only-change-me' });
   await app.register(cors, {
