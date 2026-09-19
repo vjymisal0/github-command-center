@@ -126,6 +126,7 @@ function contains(value: string, needle = '') {
 
 export async function buildApp(opts: { logger?: boolean } = {}) {
   const prisma = new PrismaClient();
+  let dbAvailable = true;
   const app: FastifyInstance = Fastify({ logger: opts.logger ?? false });
   await app.register(helmet);
   await app.register(sensible);
@@ -145,10 +146,12 @@ export async function buildApp(opts: { logger?: boolean } = {}) {
     const sid = request.cookies?.sid;
     if (!sid) return null;
     try {
+      if (!dbAvailable) throw new Error('database disabled');
       const session = await prisma.session.findUnique({ where: { id: sid }, include: { user: true } });
       if (!session || session.expiresAt < new Date()) return null;
       return session.user;
     } catch {
+      dbAvailable = false;
       const email = memorySessions.get(sid);
       if (!email) return null;
       return {
@@ -173,13 +176,17 @@ export async function buildApp(opts: { logger?: boolean } = {}) {
     where: { email: adminEmail },
     update: {},
     create: { email: adminEmail, name: 'Demo Admin', passwordHash: hashPassword(adminPassword) },
-  }).catch(error => app.log.warn({ error }, 'database unavailable; using in-memory auth fallback'));
+  }).catch(error => {
+    dbAvailable = false;
+    app.log.warn({ error }, 'database unavailable; using in-memory auth fallback');
+  });
 
   app.get('/health', async () => ({ ok: true }));
 
   app.post('/auth/login', async (request, reply) => {
     const body = loginBody.parse(request.body);
     try {
+      if (!dbAvailable) throw new Error('database disabled');
       let user = await prisma.user.findUnique({ where: { email: body.email } });
       if (!user) {
         user = await prisma.user.create({
@@ -195,12 +202,13 @@ export async function buildApp(opts: { logger?: boolean } = {}) {
       const sid = randomUUID();
       await prisma.session.create({ data: { id: sid, userId: user.id, expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30) } });
       reply.setCookie('sid', sid, { httpOnly: true, sameSite: 'lax', path: '/', signed: false });
-      return reply.redirect('http://localhost:3000/settings/connections');
+      return reply.redirect(`${process.env.PUBLIC_WEB_URL ?? 'http://localhost:3000'}/settings/connections`);
     } catch {
+      dbAvailable = false;
       const sid = randomUUID();
       memorySessions.set(sid, body.email);
       reply.setCookie('sid', sid, { httpOnly: true, sameSite: 'lax', path: '/', signed: false });
-      return reply.redirect('http://localhost:3000/settings/connections');
+      return reply.redirect(`${process.env.PUBLIC_WEB_URL ?? 'http://localhost:3000'}/settings/connections`);
     }
   });
 
@@ -208,7 +216,7 @@ export async function buildApp(opts: { logger?: boolean } = {}) {
     const sid = request.cookies.sid;
     if (sid) { memorySessions.delete(sid); await prisma.session.delete({ where: { id: sid } }).catch(() => null); }
     reply.clearCookie('sid', { path: '/' });
-    return reply.redirect('http://localhost:3000/login');
+    return reply.redirect(`${process.env.PUBLIC_WEB_URL ?? 'http://localhost:3000'}/login`);
   });
 
   app.get('/auth/me', async request => {
@@ -223,11 +231,13 @@ export async function buildApp(opts: { logger?: boolean } = {}) {
     const userConns = memoryConnections.get(userId) ?? [];
     let dbConns: Array<{ type: string; status: string; id: string }> = [];
     try {
+      if (!dbAvailable) throw new Error('database disabled');
       const records = await prisma.gitHubConnection.findMany({
         where: { userId, status: 'ACTIVE' },
       });
       dbConns = records.map(r => ({ type: r.type, status: r.status.toLowerCase(), id: r.id }));
     } catch {
+      dbAvailable = false;
       dbConns = userConns.map(r => ({ type: r.type, status: r.status.toLowerCase(), id: r.id }));
     }
 
@@ -505,7 +515,7 @@ export async function buildApp(opts: { logger?: boolean } = {}) {
 
     const accept = request.headers.accept ?? '';
     if (accept.includes('text/html')) {
-      return reply.redirect('http://localhost:3000/settings/connections?connected=true');
+      return reply.redirect(`${process.env.PUBLIC_WEB_URL ?? 'http://localhost:3000'}/settings/connections?connected=true`);
     }
 
     return {
@@ -526,7 +536,7 @@ export async function buildApp(opts: { logger?: boolean } = {}) {
     const userId = user?.id ?? 'memory_admin';
     const state = randomUUID();
     oauthStates.set(state, userId);
-    const callbackUrl = process.env.GITHUB_OAUTH_CALLBACK_URL ?? 'http://localhost:4000/auth/github/callback';
+    const callbackUrl = process.env.GITHUB_OAUTH_CALLBACK_URL ?? `${process.env.PUBLIC_API_URL ?? 'http://localhost:4000'}/auth/github/callback`;
     const params = new URLSearchParams({
       client_id: clientId,
       redirect_uri: callbackUrl,
@@ -555,7 +565,7 @@ export async function buildApp(opts: { logger?: boolean } = {}) {
     if (!tokenJson.access_token) return app.httpErrors.unauthorized(tokenJson.error_description ?? 'GitHub OAuth token exchange failed.');
 
     await connectGitHubToken(userId, tokenJson.access_token, request.log);
-    return reply.redirect('http://localhost:3000/settings/connections?connected=true');
+    return reply.redirect(`${process.env.PUBLIC_WEB_URL ?? 'http://localhost:3000'}/settings/connections?connected=true`);
   });
 
   const deleteConnectionHandler = async (request: FastifyRequest, reply: FastifyReply) => {
@@ -588,7 +598,7 @@ export async function buildApp(opts: { logger?: boolean } = {}) {
 
     const accept = request.headers.accept ?? '';
     if (accept.includes('text/html')) {
-      return reply.redirect('http://localhost:3000/settings/connections?disconnected=true');
+      return reply.redirect(`${process.env.PUBLIC_WEB_URL ?? 'http://localhost:3000'}/settings/connections?disconnected=true`);
     }
 
     return {

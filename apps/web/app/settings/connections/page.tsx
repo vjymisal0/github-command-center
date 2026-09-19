@@ -32,7 +32,7 @@ export default async function ConnectionsPage({
 
       {!hasAccounts && (
         <div className="connect-grid">
-          <a className="connect-card primary" href="http://localhost:4000/auth/github">
+          <a className="connect-card primary" href={`${process.env.NEXT_PUBLIC_API_URL ?? 'http://127.0.0.1:4000'}/auth/github`}>
             <span>Browser authorization</span>
             <strong>Sign in with GitHub</strong>
             <p>Continue to GitHub to review access. OAuth requests broad repository permissions; use a fine-grained PAT for narrower access.</p>

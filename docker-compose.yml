@@ -6,7 +6,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gcc}
       POSTGRES_DB: ${POSTGRES_DB:-gcc}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres:/var/lib/postgresql/data
     healthcheck:
@@ -18,7 +18,7 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -30,11 +30,17 @@ services:
       context: .
       dockerfile: apps/api/Dockerfile
     ports:
-      - "4000:4000"
+      - "127.0.0.1:4100:4000"
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-gcc}:${POSTGRES_PASSWORD:-gcc}@postgres:5432/${POSTGRES_DB:-gcc}
       REDIS_URL: redis://redis:6379
       SESSION_SECRET: ${SESSION_SECRET:-super-secret-production-key-change-me}
+      PUBLIC_WEB_URL: ${PUBLIC_WEB_URL:-http://localhost:3100}
+      PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:4100}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      GITHUB_OAUTH_CALLBACK_URL: ${GITHUB_OAUTH_CALLBACK_URL:-http://localhost:4100/auth/github/callback}
+      GITHUB_WEBHOOK_SECRET: ${GITHUB_WEBHOOK_SECRET:-}
       CREDENTIAL_ENCRYPTION_KEY: ${CREDENTIAL_ENCRYPTION_KEY:-0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef}
     depends_on:
       postgres:
@@ -47,9 +53,10 @@ services:
       context: .
       dockerfile: apps/web/Dockerfile
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3100:3000"
     environment:
-      NEXT_PUBLIC_API_URL: http://api:4000
+      NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:4100}
+      PUBLIC_WEB_URL: ${PUBLIC_WEB_URL:-http://localhost:3100}
     depends_on:
       - api
 

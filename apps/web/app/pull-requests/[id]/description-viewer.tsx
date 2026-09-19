@@ -19,7 +19,7 @@ export function PrDescriptionViewer({ prId }: { prId: string }) {
     setError(null);
 
     try {
-      const res = await fetch(`http://localhost:4000/pull-requests/${encodeURIComponent(prId)}/description`);
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? 'http://127.0.0.1:4000'}/pull-requests/${encodeURIComponent(prId)}/description`);
       if (!res.ok) {
         throw new Error('Failed to load description');
       }

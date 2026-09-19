@@ -16,7 +16,7 @@ export function SyncButton({ initialLastSync, connected }: { initialLastSync: st
     setLoading(true);
     setStatusMsg(null);
     try {
-      const syncRes = await fetch('http://localhost:4000/sync', { method: 'POST' });
+      const syncRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? 'http://127.0.0.1:4000'}/sync`, { method: 'POST' });
       if (!syncRes.ok) throw new Error('Sync failed');
       setLastSync(new Date().toISOString());
       setStatusMsg('Synchronized');
