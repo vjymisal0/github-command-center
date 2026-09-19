@@ -79,16 +79,20 @@ export async function buildApp(opts: { logger?: boolean } = {}) {
   const prisma = new PrismaClient();
   const app: FastifyInstance = Fastify({ logger: opts.logger ?? false });
   await app.register(helmet);
-  await app.register(sensible);
   await app.register(formbody);
-  await app.register(cors, { origin: true, credentials: true });
   await app.register(cookie, { secret: process.env.SESSION_SECRET ?? 'dev-only-change-me' });
+  await app.register(cors, {
+    origin: true,
+    credentials: true,
+    methods: ['GET', 'HEAD', 'PUT', 'POST', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+  });
 
   const adminEmail = process.env.DEMO_ADMIN_EMAIL ?? 'admin@example.com';
   const adminPassword = process.env.DEMO_ADMIN_PASSWORD ?? 'password';
 
   async function currentUser(request: FastifyRequest) {
-    const sid = request.cookies.sid;
+    const sid = request.cookies?.sid;
     if (!sid) return null;
     try {
       const session = await prisma.session.findUnique({ where: { id: sid }, include: { user: true } });
@@ -438,7 +442,7 @@ export async function buildApp(opts: { logger?: boolean } = {}) {
     };
   });
 
-  app.delete('/connections/:id', async (request, reply) => {
+  const deleteConnectionHandler = async (request: FastifyRequest, reply: FastifyReply) => {
     const user = await currentUser(request);
     const userId = user?.id ?? 'memory_admin';
     const { id } = request.params as { id: string };
@@ -460,6 +464,12 @@ export async function buildApp(opts: { logger?: boolean } = {}) {
       memoryRepos.push(...fixtureRepos);
       memoryPrs.length = 0;
       memoryPrs.push(...fixturePrs.map(p => ({ ...p, reasons: [...p.reasons] })));
+      totalMergedPrsCount = 0;
+    }
+
+    const accept = request.headers.accept ?? '';
+    if (accept.includes('text/html')) {
+      return reply.redirect('http://localhost:3000/settings/connections?disconnected=true');
     }
 
     return {
@@ -467,7 +477,11 @@ export async function buildApp(opts: { logger?: boolean } = {}) {
       message: 'GitHub connection removed successfully.',
       remaining: updated.length,
     };
-  });
+  };
+
+  app.delete('/connections/:id', deleteConnectionHandler);
+  app.post('/connections/:id/delete', deleteConnectionHandler);
+  app.post('/connections/:id/disconnect', deleteConnectionHandler);
 
   app.get('/sync/status', async request => {
     const user = await currentUser(request);
@@ -610,21 +624,6 @@ export async function buildApp(opts: { logger?: boolean } = {}) {
     }
 
     return { received: true, event, deliveryId };
-  });
-
-  app.post('/connections/:id/disconnect', async request => {
-    const { id } = request.params as { id: string };
-    const user = await currentUser(request);
-    const userId = user?.id ?? 'memory_admin';
-
-    try {
-      await prisma.gitHubConnection.deleteMany({ where: { id, userId } });
-    } catch {
-      const list = memoryConnections.get(userId) ?? [];
-      memoryConnections.set(userId, list.filter(c => c.id !== id));
-    }
-
-    return { ok: true, disconnected: id };
   });
 
   return app;

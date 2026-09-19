@@ -16,7 +16,7 @@ export default async function ConnectionsPage({
 
   return (
     <section>
-      <PageHeader eyebrow="Settings" title="GitHub connections">
+      <PageHeader eyebrow="Settings" title="Git Access">
         <p>Connect one or multiple GitHub accounts via fine-grained PAT. All tokens are encrypted using AES-256-GCM.</p>
       </PageHeader>
 

@@ -25,10 +25,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </a>
           <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flex: 1 }}>
             <a href="/">Overview</a>
-            <a href="/inbox">Inbox</a>
-            <a href="/pull-requests">Pull Requests</a>
+            <a href="/pull-requests">PRs</a>
             <a href="/repositories">Repositories</a>
-            <a href="/settings/connections">Connections</a>
+            <a href="/settings/connections">Git Access</a>
           </div>
           <div style={{ display: 'flex', gap: '0.65rem', alignItems: 'center' }}>
             <SearchModal />

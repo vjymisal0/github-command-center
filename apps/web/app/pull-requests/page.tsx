@@ -11,7 +11,7 @@ export default async function PullRequestsPage({
 
   return (
     <section>
-      <PageHeader eyebrow="Pull requests" title="PR explorer">
+      <PageHeader eyebrow="PRs" title="PRs">
         <form className="filters" method="get">
           <input
             name="search"

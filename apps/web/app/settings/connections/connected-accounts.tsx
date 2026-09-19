@@ -21,25 +21,31 @@ export function ConnectedAccountsList({
 
     setRemovingId(id);
     try {
-      const res = await fetch(`http://localhost:4000/connections/${encodeURIComponent(id)}`, {
-        method: 'DELETE',
+      const res = await fetch(`http://localhost:4000/connections/${encodeURIComponent(id)}/delete`, {
+        method: 'POST',
       });
-      if (!res.ok) {
-        throw new Error('Failed to remove token');
+      if (res.ok) {
+        setMsg(`Disconnected @${username}. Reloading...`);
+        setTimeout(() => {
+          window.location.href = '/settings/connections';
+        }, 300);
+        return;
       }
-      setMsg(`Disconnected @${username}. Reloading...`);
-      setTimeout(() => {
-        window.location.href = '/settings/connections';
-      }, 500);
-    } catch (err: any) {
-      alert(err.message || 'Error disconnecting token');
-      setRemovingId(null);
+    } catch {
+      // Fallback to standard form post
     }
+
+    // Direct form submit fallback guarantees cross-origin deletion succeeds
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = `http://localhost:4000/connections/${encodeURIComponent(id)}/delete`;
+    document.body.appendChild(form);
+    form.submit();
   }
 
   return (
     <div className="panel" style={{ marginTop: '1.5rem' }}>
-      <h2>Connected GitHub Accounts</h2>
+      <h2>Active Git Access Accounts</h2>
       <p>Manage and revoke connected personal access tokens.</p>
       {msg && <p style={{ color: 'var(--accent)' }}>{msg}</p>}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '1rem' }}>
@@ -51,14 +57,14 @@ export function ConnectedAccountsList({
               alignItems: 'center',
               justifyContent: 'space-between',
               padding: '0.75rem 1rem',
-              background: 'var(--panel)',
-              border: '1px solid var(--border)',
-              borderRadius: '0.375rem',
+              background: 'var(--card)',
+              border: '1px solid var(--line)',
+              borderRadius: 'var(--radius-sm)',
             }}
           >
             <div>
               <strong>@{acc.username}</strong>
-              <small style={{ display: 'block', color: 'var(--muted)' }}>PAT Connection ID: {acc.id}</small>
+              <small style={{ display: 'block', color: 'var(--muted)' }}>Git Access Token: {acc.id}</small>
             </div>
             <button
               className="button"

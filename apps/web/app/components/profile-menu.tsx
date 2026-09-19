@@ -71,7 +71,7 @@ export function ProfileMenu() {
             }}
             onClick={() => setOpen(false)}
           >
-            GitHub Connections
+            Git Access
           </a>
         </div>
       )}
