@@ -1,23 +1,21 @@
 import cookie from '@fastify/cookie';
 import helmet from '@fastify/helmet';
 import sensible from '@fastify/sensible';
+import { PrismaClient } from '@prisma/client';
 import { prs, repos } from '@gcc/shared/fixtures';
 import Fastify, { type FastifyRequest } from 'fastify';
 import { randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
 
+const prisma = new PrismaClient();
 const app = Fastify({ logger: true });
 await app.register(helmet);
 await app.register(sensible);
 await app.register(cookie, { secret: process.env.SESSION_SECRET ?? 'dev-only-change-me' });
 
-const demoUser = {
-  id: 'user_demo',
-  email: process.env.DEMO_ADMIN_EMAIL ?? 'admin@example.com',
-  name: 'Demo Admin',
-  passwordHash: hashPassword(process.env.DEMO_ADMIN_PASSWORD ?? 'password'),
-};
-const sessions = new Map<string, string>();
+const adminEmail = process.env.DEMO_ADMIN_EMAIL ?? 'admin@example.com';
+const adminPassword = process.env.DEMO_ADMIN_PASSWORD ?? 'password';
+const memorySessions = new Map<string, string>();
 
 const listQuery = z.object({
   search: z.string().optional(),
@@ -28,47 +26,70 @@ const listQuery = z.object({
 const loginBody = z.object({ email: z.string().email(), password: z.string().min(1) });
 
 function hashPassword(password: string) {
-  return scryptSync(password, 'demo-static-salt', 32);
+  return scryptSync(password, 'demo-static-salt', 32).toString('hex');
 }
 
-function verifyPassword(password: string, expected: Buffer) {
-  return timingSafeEqual(hashPassword(password), expected);
+function verifyPassword(password: string, expected: string) {
+  return timingSafeEqual(Buffer.from(hashPassword(password), 'hex'), Buffer.from(expected, 'hex'));
 }
 
 function contains(value: string, needle = '') {
   return value.toLowerCase().includes(needle.toLowerCase());
 }
 
-function currentUser(request: FastifyRequest) {
+async function currentUser(request: FastifyRequest) {
   const sid = request.cookies.sid;
-  return sid && sessions.get(sid) === demoUser.id ? demoUser : null;
+  if (!sid) return null;
+  try {
+    const session = await prisma.session.findUnique({ where: { id: sid }, include: { user: true } });
+    if (!session || session.expiresAt < new Date()) return null;
+    return session.user;
+  } catch {
+    return memorySessions.get(sid) === adminEmail ? { id: 'memory_admin', email: adminEmail, name: 'Demo Admin' } : null;
+  }
 }
 
-function publicUser() {
-  return { id: demoUser.id, email: demoUser.email, name: demoUser.name };
+function publicUser(user: { id: string; email: string; name: string | null }) {
+  return { id: user.id, email: user.email, name: user.name };
 }
+
+await prisma.user.upsert({
+  where: { email: adminEmail },
+  update: {},
+  create: { email: adminEmail, name: 'Demo Admin', passwordHash: hashPassword(adminPassword) },
+}).catch(error => app.log.warn({ error }, 'database unavailable; using in-memory auth fallback'));
 
 app.get('/health', async () => ({ ok: true }));
 
 app.post('/auth/login', async (request, reply) => {
   const body = loginBody.parse(request.body);
-  if (body.email !== demoUser.email || !verifyPassword(body.password, demoUser.passwordHash)) {
-    return app.httpErrors.unauthorized('Invalid email or password');
+  try {
+    const user = await prisma.user.findUnique({ where: { email: body.email } });
+    if (!user || !verifyPassword(body.password, user.passwordHash)) return app.httpErrors.unauthorized('Invalid email or password');
+    const sid = randomUUID();
+    await prisma.session.create({ data: { id: sid, userId: user.id, expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30) } });
+    reply.setCookie('sid', sid, { httpOnly: true, sameSite: 'lax', path: '/', signed: false });
+    return { user: publicUser(user) };
+  } catch {
+    if (body.email !== adminEmail || body.password !== adminPassword) return app.httpErrors.unauthorized('Invalid email or password');
+    const sid = randomUUID();
+    memorySessions.set(sid, adminEmail);
+    reply.setCookie('sid', sid, { httpOnly: true, sameSite: 'lax', path: '/', signed: false });
+    return { user: { id: 'memory_admin', email: adminEmail, name: 'Demo Admin' }, warning: 'database unavailable; session is in-memory' };
   }
-  const sid = randomUUID();
-  sessions.set(sid, demoUser.id);
-  reply.setCookie('sid', sid, { httpOnly: true, sameSite: 'lax', path: '/', signed: false });
-  return { user: publicUser() };
 });
 
 app.post('/auth/logout', async (request, reply) => {
   const sid = request.cookies.sid;
-  if (sid) sessions.delete(sid);
+  if (sid) { memorySessions.delete(sid); await prisma.session.delete({ where: { id: sid } }).catch(() => null); }
   reply.clearCookie('sid', { path: '/' });
   return { ok: true };
 });
 
-app.get('/auth/me', async request => ({ user: currentUser(request) ? publicUser() : null }));
+app.get('/auth/me', async request => {
+  const user = await currentUser(request);
+  return { user: user ? publicUser(user) : null };
+});
 
 app.get('/connections', async () => ({
   data: [
