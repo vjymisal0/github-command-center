@@ -69,6 +69,7 @@ test('GET /analytics/overview returns aggregated metric counts', async () => {
   assert.equal(response.statusCode, 200);
   const json = response.json();
   assert.equal(typeof json.openPullRequests, 'number');
+  assert.equal(typeof json.mergedPullRequests, 'number');
   assert.equal(typeof json.actionItems, 'number');
   assert.equal(typeof json.repositories, 'number');
   await app.close();

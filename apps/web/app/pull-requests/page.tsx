@@ -22,7 +22,9 @@ export default async function PullRequestsPage({
           <select name="state" defaultValue={state ?? ''} aria-label="State">
             <option value="">All states</option>
             <option value="Open">Open</option>
+            <option value="Merged">Merged</option>
             <option value="Draft">Draft</option>
+            <option value="Closed">Closed</option>
           </select>
           <select name="ci" defaultValue={ci ?? ''} aria-label="CI status">
             <option value="">All CI</option>

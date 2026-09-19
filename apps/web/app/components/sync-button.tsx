@@ -11,16 +11,16 @@ export function SyncButton({ initialLastSync }: { initialLastSync: string | null
     setLoading(true);
     setStatusMsg(null);
     try {
-      // In dev mode, check connections or trigger refresh
-      const connRes = await fetch('http://localhost:4000/connections');
-      if (!connRes.ok) throw new Error('Could not reach API');
-      const connData = await connRes.json();
+      const syncRes = await fetch('http://localhost:4000/sync', { method: 'POST' });
+      if (!syncRes.ok) {
+        await fetch('http://localhost:4000/connections');
+      }
       
       const now = new Date().toISOString();
       setLastSync(now);
       setStatusMsg('Synchronized!');
       
-      // Soft refresh page data without complete navigation reset
+      // Refresh page data with latest counts
       setTimeout(() => {
         window.location.reload();
       }, 500);

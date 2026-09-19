@@ -51,6 +51,7 @@ const memorySessions = new Map<string, string>();
 const memoryConnections = new Map<string, StoredConnection[]>();
 let memoryRepos: RepoItem[] = [...fixtureRepos];
 let memoryPrs: PRItem[] = fixturePrs.map(p => ({ ...p, reasons: [...p.reasons] }));
+let totalMergedPrsCount = 0;
 
 const listQuery = z.object({
   search: z.string().optional(),
@@ -221,6 +222,133 @@ export async function buildApp(opts: { logger?: boolean } = {}) {
     }
   });
 
+  async function syncGitHubData(token: string, ghUser: { login: string; id?: number }, log?: any) {
+    const octokit = new Octokit({ auth: token });
+
+    // 1. Fetch user's direct repositories
+    const reposRes = await octokit.rest.repos.listForAuthenticatedUser({
+      per_page: 50,
+      affiliation: 'owner,collaborator,organization_member',
+      sort: 'updated',
+    });
+
+    const newRepos: RepoItem[] = [];
+    const newPrs: PRItem[] = [];
+
+    for (const r of reposRes.data) {
+      const isOwner = r.owner.login.toLowerCase() === ghUser.login.toLowerCase();
+      newRepos.push({
+        id: `repo_${r.id}`,
+        name: r.full_name,
+        relationship: isOwner ? 'Owned' : 'Collaborating',
+        visibility: r.private ? 'Private' : 'Public',
+        prs: 0,
+        synced: 'just now',
+      });
+    }
+
+    // 2. Discover external authored PRs (open & merged) & review requested PRs via GitHub Search API
+    const [authoredOpenSearch, authoredMergedSearch, reviewSearch] = await Promise.all([
+      octokit.rest.search.issuesAndPullRequests({
+        q: `type:pr author:${ghUser.login} state:open`,
+        per_page: 100,
+        sort: 'updated',
+      }).catch(() => ({ data: { items: [], total_count: 0 } })),
+      octokit.rest.search.issuesAndPullRequests({
+        q: `type:pr author:${ghUser.login} is:merged`,
+        per_page: 100,
+        sort: 'updated',
+      }).catch(() => ({ data: { items: [], total_count: 0 } })),
+      octokit.rest.search.issuesAndPullRequests({
+        q: `type:pr review-requested:${ghUser.login} state:open`,
+        per_page: 50,
+        sort: 'updated',
+      }).catch(() => ({ data: { items: [], total_count: 0 } })),
+    ]);
+
+    if (authoredMergedSearch.data.total_count) {
+      totalMergedPrsCount = Math.max(totalMergedPrsCount, authoredMergedSearch.data.total_count);
+    }
+
+    const mergedIds = new Set(authoredMergedSearch.data.items.map(m => m.id));
+    const searchItems = [
+      ...authoredOpenSearch.data.items,
+      ...authoredMergedSearch.data.items,
+      ...reviewSearch.data.items,
+    ];
+    const seenSearchIds = new Set<number>();
+
+    for (const item of searchItems) {
+      if (seenSearchIds.has(item.id)) continue;
+      seenSearchIds.add(item.id);
+
+      const repoName = item.repository_url.replace('https://api.github.com/repos/', '');
+      const isReviewRequested = reviewSearch.data.items.some(r => r.id === item.id);
+      const isAuthor = (item.user?.login ?? '').toLowerCase() === ghUser.login.toLowerCase();
+      const isMerged = mergedIds.has(item.id) || Boolean((item as any).pull_request?.merged_at);
+      const isDraft = Boolean((item as any).draft);
+      const stateStr = isMerged ? 'Merged' : isDraft ? 'Draft' : item.state === 'closed' ? 'Closed' : 'Open';
+
+      if (!newRepos.some(nr => nr.name.toLowerCase() === repoName.toLowerCase())) {
+        newRepos.push({
+          id: `repo_ext_${repoName.replace('/', '_')}`,
+          name: repoName,
+          relationship: 'External contribution',
+          visibility: 'Public',
+          prs: 1,
+          synced: 'just now',
+        });
+      }
+
+      const facts: PullRequestFacts = {
+        authorLogin: item.user?.login ?? '',
+        currentUserLogin: ghUser.login,
+        draft: isDraft,
+        state: isMerged ? 'MERGED' : item.state === 'open' ? 'OPEN' : 'CLOSED',
+        reviewRequested: isReviewRequested,
+      };
+
+      const reasons = classifyActionReasons(facts);
+
+      newPrs.push({
+        id: `pr_${item.id}`,
+        repo: repoName,
+        number: item.number,
+        title: item.title,
+        author: item.user?.login ?? 'unknown',
+        state: stateStr,
+        ci: 'Passing',
+        review: isMerged ? 'Merged' : isReviewRequested ? 'Review requested' : isAuthor ? 'Waiting for review' : 'None',
+        reasons,
+        updated: item.updated_at ? new Date(item.updated_at).toLocaleDateString() : 'recently',
+        htmlUrl: item.html_url,
+        description: item.body || 'No description provided.',
+      });
+    }
+
+    // Update repo PR counts
+    newRepos.forEach(repo => {
+      repo.prs = newPrs.filter(p => p.repo.toLowerCase() === repo.name.toLowerCase()).length;
+    });
+
+    // Ingest live records
+    if (newRepos.length > 0) {
+      const existingNames = new Set(newRepos.map(nr => nr.name));
+      memoryRepos = [...newRepos, ...memoryRepos.filter(er => !existingNames.has(er.name))];
+    }
+
+    if (newPrs.length > 0) {
+      const existingIds = new Set(newPrs.map(np => np.id));
+      memoryPrs = [...newPrs, ...memoryPrs.filter(ep => !existingIds.has(ep.id))];
+    }
+
+    if (log) {
+      log.info({ repos: newRepos.length, prs: newPrs.length, merged: totalMergedPrsCount }, 'GitHub sync completed');
+    }
+
+    return { reposCount: newRepos.length, prsCount: newPrs.length, mergedCount: totalMergedPrsCount };
+  }
+
   app.post('/connections/pat', async (request, reply) => {
     const user = await currentUser(request);
     const userId = user?.id ?? 'memory_admin';
@@ -289,106 +417,7 @@ export async function buildApp(opts: { logger?: boolean } = {}) {
     }
 
     try {
-      // 1. Fetch user's direct repositories
-      const reposRes = await octokit.rest.repos.listForAuthenticatedUser({
-        per_page: 50,
-        affiliation: 'owner,collaborator,organization_member',
-        sort: 'updated',
-      });
-
-      const newRepos: RepoItem[] = [];
-      const newPrs: PRItem[] = [];
-
-      for (const r of reposRes.data) {
-        const isOwner = r.owner.login.toLowerCase() === ghUser.login.toLowerCase();
-        newRepos.push({
-          id: `repo_${r.id}`,
-          name: r.full_name,
-          relationship: isOwner ? 'Owned' : 'Collaborating',
-          visibility: r.private ? 'Private' : 'Public',
-          prs: 0,
-          synced: 'just now',
-        });
-      }
-
-      // 2. Discover external authored PRs & review requested PRs via GitHub Search API (as per Implementation Plan §7)
-      const [authoredSearch, reviewSearch] = await Promise.all([
-        octokit.rest.search.issuesAndPullRequests({
-          q: `type:pr author:${ghUser.login} state:open`,
-          per_page: 50,
-          sort: 'updated',
-        }).catch(() => ({ data: { items: [] } })),
-        octokit.rest.search.issuesAndPullRequests({
-          q: `type:pr review-requested:${ghUser.login} state:open`,
-          per_page: 30,
-          sort: 'updated',
-        }).catch(() => ({ data: { items: [] } })),
-      ]);
-
-      const searchItems = [...authoredSearch.data.items, ...reviewSearch.data.items];
-      const seenSearchIds = new Set<number>();
-
-      for (const item of searchItems) {
-        if (seenSearchIds.has(item.id)) continue;
-        seenSearchIds.add(item.id);
-
-        const repoName = item.repository_url.replace('https://api.github.com/repos/', '');
-        const isReviewRequested = reviewSearch.data.items.some(r => r.id === item.id);
-        const isAuthor = (item.user?.login ?? '').toLowerCase() === ghUser.login.toLowerCase();
-
-        // Also add external repos to repo list if not already present
-        if (!newRepos.some(nr => nr.name.toLowerCase() === repoName.toLowerCase())) {
-          newRepos.push({
-            id: `repo_ext_${repoName.replace('/', '_')}`,
-            name: repoName,
-            relationship: 'External contribution',
-            visibility: 'Public',
-            prs: 1,
-            synced: 'just now',
-          });
-        }
-
-        const facts: PullRequestFacts = {
-          authorLogin: item.user?.login ?? '',
-          currentUserLogin: ghUser.login,
-          draft: (item as any).draft ?? false,
-          state: item.state === 'open' ? 'OPEN' : 'CLOSED',
-          reviewRequested: isReviewRequested,
-        };
-
-        const reasons = classifyActionReasons(facts);
-
-        newPrs.push({
-          id: `pr_${item.id}`,
-          repo: repoName,
-          number: item.number,
-          title: item.title,
-          author: item.user?.login ?? 'unknown',
-          state: (item as any).draft ? 'Draft' : 'Open',
-          ci: 'Passing',
-          review: isReviewRequested ? 'Review requested' : isAuthor ? 'Waiting for review' : 'None',
-          reasons,
-          updated: item.updated_at ? new Date(item.updated_at).toLocaleDateString() : 'recently',
-          htmlUrl: item.html_url,
-          description: item.body || 'No description provided.',
-        });
-      }
-
-      // Update repo PR counts
-      newRepos.forEach(repo => {
-        repo.prs = newPrs.filter(p => p.repo.toLowerCase() === repo.name.toLowerCase()).length;
-      });
-
-      // Ingest live records
-      if (newRepos.length > 0) {
-        const existingNames = new Set(newRepos.map(nr => nr.name));
-        memoryRepos = [...newRepos, ...memoryRepos.filter(er => !existingNames.has(er.name))];
-      }
-
-      if (newPrs.length > 0) {
-        const existingIds = new Set(newPrs.map(np => np.id));
-        memoryPrs = [...newPrs, ...memoryPrs.filter(ep => !existingIds.has(ep.id))];
-      }
+      await syncGitHubData(token, { login: ghUser.login, id: ghUser.id }, request.log);
     } catch (err) {
       request.log.warn({ err }, 'Live sync failed during PAT setup');
     }
@@ -450,6 +479,34 @@ export async function buildApp(opts: { logger?: boolean } = {}) {
       state: configured ? 'synced' : 'not_configured',
       message: configured ? `${userConns.length} GitHub account(s) active.` : 'Connect GitHub before first sync.',
       lastSuccessfulSync: configured ? new Date().toISOString() : null,
+    };
+  });
+
+  app.post('/sync', async (request, reply) => {
+    const user = await currentUser(request);
+    const userId = user?.id ?? 'memory_admin';
+    const list = memoryConnections.get(userId) ?? [];
+
+    let syncedAccounts = 0;
+    for (const conn of list) {
+      if (conn.token) {
+        try {
+          await syncGitHubData(conn.token, { login: conn.username, id: 0 }, request.log);
+          syncedAccounts++;
+        } catch (err) {
+          request.log.warn({ err }, 'Failed sync for connection ' + conn.username);
+        }
+      }
+    }
+
+    return {
+      ok: true,
+      syncedAccounts,
+      counts: {
+        repositories: memoryRepos.length,
+        pullRequests: memoryPrs.length,
+        mergedPullRequests: Math.max(memoryPrs.filter(p => p.state === 'Merged').length, totalMergedPrsCount),
+      },
     };
   });
 
@@ -516,6 +573,7 @@ export async function buildApp(opts: { logger?: boolean } = {}) {
 
   app.get('/analytics/overview', async () => ({
     openPullRequests: memoryPrs.filter(pr => pr.state === 'Open').length,
+    mergedPullRequests: Math.max(memoryPrs.filter(pr => pr.state === 'Merged').length, totalMergedPrsCount),
     actionItems: memoryPrs.reduce((sum, pr) => sum + pr.reasons.length, 0),
     failingChecks: memoryPrs.filter(pr => pr.ci === 'Failing').length,
     repositories: memoryRepos.length,

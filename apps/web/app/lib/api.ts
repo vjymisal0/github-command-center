@@ -4,6 +4,7 @@ const apiBase = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
 export interface OverviewStats {
   openPullRequests: number;
+  mergedPullRequests?: number;
   actionItems: number;
   failingChecks: number;
   repositories: number;
@@ -67,6 +68,7 @@ async function get<T>(path: string, fallback: T): Promise<T> {
 export const api = {
   overview: () => get<OverviewStats>('/analytics/overview', {
     openPullRequests: prs.filter(pr => pr.state === 'Open').length,
+    mergedPullRequests: (prs as readonly { state: string }[]).filter(pr => pr.state === 'Merged' || pr.state === 'Closed').length,
     actionItems: prs.reduce((sum, pr) => sum + pr.reasons.length, 0),
     failingChecks: prs.filter(pr => pr.ci === 'Failing').length,
     repositories: repos.length,

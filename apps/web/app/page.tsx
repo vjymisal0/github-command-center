@@ -15,8 +15,8 @@ export default async function OverviewPage() {
   const actionItems = overview.actionItems;
   const failingChecks = overview.failingChecks;
   
-  // Real merged PR count from data or fallback calculation
-  const mergedPRs = pullRequestsData.data.filter(
+  // Real merged PR count from overview or PR data
+  const mergedPRs = overview.mergedPullRequests ?? pullRequestsData.data.filter(
     pr => pr.state.toLowerCase() === 'merged' || pr.state.toLowerCase() === 'closed'
   ).length;
 
@@ -131,7 +131,7 @@ export default async function OverviewPage() {
         </a>
 
         {/* 4. Merged PRs */}
-        <a className="metric-card" href="/pull-requests">
+        <a className="metric-card" href="/pull-requests?state=Merged">
           <div>
             <div className="metric-header">
               <span className="metric-label">Merged PRs</span>
