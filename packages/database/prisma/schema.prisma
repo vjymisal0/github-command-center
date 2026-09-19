@@ -1,0 +1,131 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ConnectionType {
+  GITHUB_APP
+  PAT
+}
+
+enum ConnectionStatus {
+  ACTIVE
+  REVOKED
+  ERROR
+}
+
+enum RepositoryVisibility {
+  PUBLIC
+  PRIVATE
+  INTERNAL
+  UNKNOWN
+}
+
+enum PullRequestState {
+  OPEN
+  MERGED
+  CLOSED
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now())
+  sessions  Session[]
+  connections GitHubConnection[]
+  repositoryAccess UserRepositoryAccess[]
+  actionItems ActionItem[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  expiresAt DateTime
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model GitHubConnection {
+  id        String @id @default(cuid())
+  userId    String
+  type      ConnectionType
+  status    ConnectionStatus @default(ACTIVE)
+  scopes    String[] @default([])
+  createdAt DateTime @default(now())
+  user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  credential EncryptedCredential?
+  repositoryAccess UserRepositoryAccess[]
+}
+
+model EncryptedCredential {
+  id           String @id @default(cuid())
+  connectionId String @unique
+  keyVersion   Int
+  ciphertext   Bytes
+  nonce        Bytes
+  tag          Bytes
+  connection   GitHubConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+}
+
+model Repository {
+  id          String @id @default(cuid())
+  githubId    BigInt @unique
+  owner       String
+  name        String
+  visibility  RepositoryVisibility @default(UNKNOWN)
+  updatedAt   DateTime @updatedAt
+  pullRequests PullRequest[]
+  userAccess  UserRepositoryAccess[]
+  @@unique([owner, name])
+}
+
+model UserRepositoryAccess {
+  id           String @id @default(cuid())
+  userId       String
+  repositoryId String
+  connectionId String?
+  relationships String[] @default([])
+  status       String @default("active")
+  lastVerifiedAt DateTime?
+  user         User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  connection   GitHubConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+  @@unique([userId, repositoryId])
+}
+
+model PullRequest {
+  id           String @id @default(cuid())
+  repositoryId String
+  githubNodeId String @unique
+  number       Int
+  title        String
+  authorLogin  String
+  state        PullRequestState
+  draft        Boolean @default(false)
+  openedAt     DateTime
+  mergedAt     DateTime?
+  closedAt     DateTime?
+  lastSyncedAt DateTime @default(now())
+  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  actionItems  ActionItem[]
+  @@unique([repositoryId, number])
+}
+
+model ActionItem {
+  id        String @id @default(cuid())
+  userId    String
+  pullRequestId String
+  reason    String
+  evidence  Json
+  severity  String @default("info")
+  firstSeenAt DateTime @default(now())
+  lastSeenAt  DateTime @default(now())
+  resolvedAt  DateTime?
+  user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pullRequest PullRequest @relation(fields: [pullRequestId], references: [id], onDelete: Cascade)
+  @@unique([userId, pullRequestId, reason])
+}

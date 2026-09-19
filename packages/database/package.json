@@ -1,0 +1,6 @@
+{
+  "name": "@gcc/database",
+  "private": true,
+  "scripts": { "generate": "prisma generate --schema prisma/schema.prisma" },
+  "dependencies": { "@prisma/client": "^6.0.1" }
+}
