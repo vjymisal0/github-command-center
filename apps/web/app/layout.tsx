@@ -1,19 +1,13 @@
 import './styles.css';
 import { ThemeToggle } from './components/theme-toggle';
-import { SearchModal } from './components/search-modal';
 
 export const metadata = { title: 'OSS Tracker' };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600&family=Nunito+Sans:ital,opsz,wght@0,6..12,400..700;1,6..12,400..700&display=swap"
-          rel="stylesheet"
-        />
+        <script dangerouslySetInnerHTML={{ __html: `try{var t=localStorage.getItem('theme');if(!t&&matchMedia('(prefers-color-scheme: dark)').matches)t='dark';if(t)document.documentElement.setAttribute('data-theme',t)}catch{}` }} />
       </head>
       <body>
         <nav className="topnav" aria-label="Main navigation">
@@ -28,7 +22,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <a href="/settings/connections">Git Access</a>
           </div>
           <div style={{ display: 'flex', gap: '0.65rem', alignItems: 'center' }}>
-            <SearchModal />
             <ThemeToggle />
           </div>
         </nav>
