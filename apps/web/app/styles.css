@@ -638,3 +638,4 @@ h1 {
   }
 }
 
+.notice{border:1px solid var(--line);border-radius:1rem;padding:1rem;margin:1rem 0;background:var(--card)}.notice.success{border-color:#16a34a;color:#15803d;background:#f0fdf4}.notice.danger{border-color:#dc2626;color:#dc2626;background:#fef2f2}.muted-card{opacity:.78}
