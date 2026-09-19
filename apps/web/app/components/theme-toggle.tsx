@@ -10,9 +10,6 @@ export function ThemeToggle() {
     if (saved) {
       setTheme(saved);
       document.documentElement.setAttribute('data-theme', saved);
-    } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      setTheme('dark');
-      document.documentElement.setAttribute('data-theme', 'dark');
     }
   }, []);
 
