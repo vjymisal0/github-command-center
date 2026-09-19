@@ -10,12 +10,9 @@ export default async function OverviewPage() {
     ['Action items', overview.actionItems, '/pull-requests', '!'],
     ['Repositories', overview.repositories, '/repositories', '#'],
   ];
-  const chart = [
-    ['Open', overview.openPullRequests, '#2563eb'],
-    ['Merged', overview.mergedPullRequests ?? 0, '#16a34a'],
-    ['Actions', overview.actionItems, '#f97316'],
-  ];
-  const max = Math.max(1, ...chart.map(([, value]) => Number(value)));
+  const total = Math.max(1, overview.openPullRequests + (overview.mergedPullRequests ?? 0) + overview.actionItems);
+  const openPct = Math.round((overview.openPullRequests / total) * 100);
+  const mergedPct = Math.round(((overview.mergedPullRequests ?? 0) / total) * 100);
 
   return (
     <section>
@@ -53,17 +50,23 @@ export default async function OverviewPage() {
       <div className="overview-panel">
         <div>
           <p className="eyebrow">Snapshot</p>
-          <h2>Pull request shape</h2>
-          <p>{connected ? 'A quick read on where your GitHub work sits right now.' : 'This will populate after your first GitHub sync.'}</p>
+          <h2>Workload mix</h2>
+          <p>{connected ? 'A compact split of your current GitHub work.' : 'Connect GitHub and this becomes a live workload chart.'}</p>
         </div>
-        <div className="mini-chart" aria-label="Pull request metrics chart">
-          {chart.map(([label, value, color]) => (
-            <div className="chart-row" key={String(label)}>
-              <span>{label}</span>
-              <div><i style={{ width: `${(Number(value) / max) * 100}%`, background: String(color) }} /></div>
-              <strong>{value}</strong>
-            </div>
-          ))}
+        <div className="donut-wrap" aria-label="Workload mix chart">
+          <div
+            className="donut"
+            style={{
+              background: `conic-gradient(#2563eb 0 ${openPct}%, #16a34a ${openPct}% ${openPct + mergedPct}%, #f97316 ${openPct + mergedPct}% 100%)`,
+            }}
+          >
+            <span>{connected ? total : 0}<small>total</small></span>
+          </div>
+          <div className="donut-legend">
+            <span><i style={{ background: '#2563eb' }} /> Open</span>
+            <span><i style={{ background: '#16a34a' }} /> Merged</span>
+            <span><i style={{ background: '#f97316' }} /> Action</span>
+          </div>
         </div>
       </div>
     </section>
