@@ -4,6 +4,14 @@
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "scripts": { "build": "tsc -p tsconfig.json" },
-  "devDependencies": { "typescript": "^5.7.2" }
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2"
+  },
+  "exports": {
+    ".": "./dist/index.js",
+    "./fixtures": "./dist/fixtures.js"
+  }
 }
