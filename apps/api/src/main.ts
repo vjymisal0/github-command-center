@@ -51,6 +51,7 @@ export interface StoredConnection {
 // Module-level storage so data persists across requests in dev mode
 const memorySessions = new Map<string, string>();
 const memoryConnections = new Map<string, StoredConnection[]>();
+const oauthStates = new Map<string, string>();
 let memoryRepos: RepoItem[] = [...fixtureRepos];
 let memoryPrs: PRItem[] = fixturePrs.map(p => ({ ...p, reasons: [...p.reasons] }));
 let totalMergedPrsCount = 0;
@@ -416,20 +417,9 @@ export async function buildApp(opts: { logger?: boolean } = {}) {
     return { reposCount: newRepos.length, prsCount: newPrs.length, mergedCount: totalMergedPrsCount };
   }
 
-  app.post('/connections/pat', async (request, reply) => {
-    const user = await currentUser(request);
-    const userId = user?.id ?? 'memory_admin';
-    const { token } = patBody.parse(request.body);
+  async function connectGitHubToken(userId: string, token: string, log: FastifyRequest['log']) {
     const octokit = new Octokit({ auth: token });
-
-    let ghUser;
-    try {
-      const res = await octokit.rest.users.getAuthenticated();
-      ghUser = res.data;
-    } catch (error) {
-      return app.httpErrors.unauthorized('GitHub token validation failed');
-    }
-
+    const { data: ghUser } = await octokit.rest.users.getAuthenticated();
     const encrypted = encryptCredential(token);
     const connectionId = `pat_${userId}_${ghUser.id}`;
     try {
@@ -486,11 +476,25 @@ export async function buildApp(opts: { logger?: boolean } = {}) {
     memoryConnections.set(userId, list);
 
     try {
-      await syncGitHubData(token, { login: ghUser.login, id: ghUser.id }, request.log);
+      await syncGitHubData(token, { login: ghUser.login, id: ghUser.id }, log);
     } catch (err) {
-      request.log.warn({ err }, 'Live sync failed during PAT setup');
+      log.warn({ err }, 'Live sync failed during PAT setup');
     }
     saveStore();
+
+    return { login: ghUser.login, id: ghUser.id, repositories: memoryRepos.length, pullRequests: memoryPrs.length };
+  }
+
+  app.post('/connections/pat', async (request, reply) => {
+    const user = await currentUser(request);
+    const userId = user?.id ?? 'memory_admin';
+    const { token } = patBody.parse(request.body);
+    let connected;
+    try {
+      connected = await connectGitHubToken(userId, token, request.log);
+    } catch {
+      return app.httpErrors.unauthorized('GitHub token validation failed');
+    }
 
     const accept = request.headers.accept ?? '';
     if (accept.includes('text/html')) {
@@ -499,13 +503,52 @@ export async function buildApp(opts: { logger?: boolean } = {}) {
 
     return {
       ok: true,
-      message: `Account @${ghUser.login} connected successfully! Repositories and PRs ingested.`,
-      user: { login: ghUser.login, id: ghUser.id },
-      counts: {
-        repositories: memoryRepos.length,
-        pullRequests: memoryPrs.length,
-      },
+      message: `Account @${connected.login} connected successfully! Repositories and PRs ingested.`,
+      user: { login: connected.login, id: connected.id },
+      counts: { repositories: connected.repositories, pullRequests: connected.pullRequests },
     };
+  });
+
+
+
+  app.get('/auth/github', async (request, reply) => {
+    const clientId = process.env.GITHUB_CLIENT_ID;
+    if (!clientId) return app.httpErrors.preconditionFailed('Set GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET to enable GitHub sign-in.');
+
+    const user = await currentUser(request);
+    const userId = user?.id ?? 'memory_admin';
+    const state = randomUUID();
+    oauthStates.set(state, userId);
+    const callbackUrl = process.env.GITHUB_OAUTH_CALLBACK_URL ?? 'http://localhost:4000/auth/github/callback';
+    const params = new URLSearchParams({
+      client_id: clientId,
+      redirect_uri: callbackUrl,
+      scope: 'repo read:user',
+      state,
+    });
+    return reply.redirect(`https://github.com/login/oauth/authorize?${params.toString()}`);
+  });
+
+  app.get('/auth/github/callback', async (request, reply) => {
+    const query = request.query as { code?: string; state?: string };
+    const userId = query.state ? oauthStates.get(query.state) : undefined;
+    if (!query.code || !query.state || !userId) return app.httpErrors.badRequest('Invalid GitHub OAuth callback.');
+    oauthStates.delete(query.state);
+
+    const clientId = process.env.GITHUB_CLIENT_ID;
+    const clientSecret = process.env.GITHUB_CLIENT_SECRET;
+    if (!clientId || !clientSecret) return app.httpErrors.preconditionFailed('GitHub OAuth is not configured.');
+
+    const tokenRes = await fetch('https://github.com/login/oauth/access_token', {
+      method: 'POST',
+      headers: { accept: 'application/json', 'content-type': 'application/json' },
+      body: JSON.stringify({ client_id: clientId, client_secret: clientSecret, code: query.code }),
+    });
+    const tokenJson = await tokenRes.json() as { access_token?: string; error_description?: string };
+    if (!tokenJson.access_token) return app.httpErrors.unauthorized(tokenJson.error_description ?? 'GitHub OAuth token exchange failed.');
+
+    await connectGitHubToken(userId, tokenJson.access_token, request.log);
+    return reply.redirect('http://localhost:3000/settings/connections?connected=true');
   });
 
   const deleteConnectionHandler = async (request: FastifyRequest, reply: FastifyReply) => {

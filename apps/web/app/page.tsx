@@ -9,6 +9,7 @@ export default async function OverviewPage() {
     api.pullRequests(),
   ]);
 
+  const connected = overview.coverage !== 'not_connected';
   const openPRs = overview.openPullRequests;
   const actionItems = overview.actionItems;
   
@@ -32,8 +33,16 @@ export default async function OverviewPage() {
           </p>
         </div>
 
-        <SyncButton initialLastSync={overview.lastSuccessfulSync} />
+        <SyncButton initialLastSync={overview.lastSuccessfulSync} connected={connected} />
       </div>
+
+      {!connected && (
+        <div className="notice warning connect-warning">
+          <strong>GitHub is not connected.</strong>
+          <span> Connect a GitHub account before syncing or viewing live pull requests.</span>
+          <a href="/settings/connections">Connect now</a>
+        </div>
+      )}
 
       {/* 4 Dashboard Metric Cards */}
       <div className="grid">

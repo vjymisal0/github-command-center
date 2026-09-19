@@ -645,3 +645,5 @@ h1 {
 [data-theme="dark"] .notice.success{background:rgba(22,163,74,.12)}
 [data-theme="dark"] .notice.danger{background:rgba(220,38,38,.12)}
 @media(max-width:680px){.hero-panel{padding:1rem}.topnav{gap:.5rem}.topnav a{padding:.3rem .45rem}}
+.notice.warning{border-color:#f59e0b;color:#92400e;background:#fffbeb}.connect-warning{display:flex;gap:.5rem;align-items:center;justify-content:space-between;flex-wrap:wrap}.connect-warning a{color:inherit;font-weight:800}.button:disabled{opacity:.45;cursor:not-allowed}
+[data-theme="dark"] .notice.warning{background:rgba(245,158,11,.14);color:#fbbf24}
