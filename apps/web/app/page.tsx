@@ -7,12 +7,11 @@ export default async function OverviewPage() {
   const cards = [
     ['Open PRs', overview.openPullRequests, '/pull-requests?state=Open', '↗'],
     ['Merged PRs', overview.mergedPullRequests ?? 0, '/pull-requests?state=Merged', '✓'],
-    ['Action items', overview.actionItems, '/pull-requests', '!'],
+    ['Action items', overview.actionItems, '/inbox', '!'],
     ['Repositories', overview.repositories, '/repositories', '#'],
   ];
-  const total = Math.max(1, overview.openPullRequests + (overview.mergedPullRequests ?? 0) + overview.actionItems);
-  const openPct = Math.round((overview.openPullRequests / total) * 100);
-  const mergedPct = Math.round(((overview.mergedPullRequests ?? 0) / total) * 100);
+  const total = overview.openPullRequests + (overview.mergedPullRequests ?? 0);
+  const openPct = total > 0 ? (overview.openPullRequests / total) * 100 : 0;
 
   return (
     <section>
@@ -50,22 +49,21 @@ export default async function OverviewPage() {
       <div className="overview-panel">
         <div>
           <p className="eyebrow">Snapshot</p>
-          <h2>Workload mix</h2>
-          <p>{connected ? 'A compact split of your current GitHub work.' : 'Connect GitHub and this becomes a live workload chart.'}</p>
+          <h2>Open &amp; merged</h2>
+          <p>{connected ? 'Reported open and merged PR counts. Drafts and closed-unmerged PRs are excluded.' : 'Your snapshot will appear after connecting GitHub and completing a sync.'}</p>
         </div>
-        <div className="donut-wrap" aria-label="Workload mix chart">
+        <div className="donut-wrap" role="img" aria-label={`Reported PR counts: ${overview.openPullRequests} open, ${overview.mergedPullRequests ?? 0} merged`}>
           <div
             className="donut"
             style={{
-              background: `conic-gradient(#2563eb 0 ${openPct}%, #16a34a ${openPct}% ${openPct + mergedPct}%, #f97316 ${openPct + mergedPct}% 100%)`,
+              background: total > 0 ? `conic-gradient(var(--chart-open) 0 ${openPct}%, var(--chart-merged) ${openPct}% 100%)` : 'var(--line)',
             }}
           >
-            <span>{connected ? total : 0}<small>total</small></span>
+            <span>{total}<small>{total ? 'reported PRs' : 'No data yet'}</small></span>
           </div>
           <div className="donut-legend">
-            <span><i style={{ background: '#2563eb' }} /> Open</span>
-            <span><i style={{ background: '#16a34a' }} /> Merged</span>
-            <span><i style={{ background: '#f97316' }} /> Action</span>
+            <span><i style={{ background: 'var(--chart-open)' }} /> Open <strong>{overview.openPullRequests}</strong></span>
+            <span><i style={{ background: 'var(--chart-merged)' }} /> Merged <strong>{overview.mergedPullRequests ?? 0}</strong></span>
           </div>
         </div>
       </div>

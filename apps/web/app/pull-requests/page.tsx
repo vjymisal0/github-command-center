@@ -11,7 +11,8 @@ export default async function PullRequestsPage({
 
   return (
     <section>
-      <PageHeader eyebrow="PRs" title="PRs">
+      <PageHeader eyebrow="Your contributions" title="Pull requests">
+        <p>Browse synchronized pull requests across your connected accounts.</p>
         <form className="filters" method="get">
           <input
             name="search"
@@ -28,17 +29,20 @@ export default async function PullRequestsPage({
           </select>
           <button className="button" type="submit">Filter</button>
           {(search || state) && (
-            <a className="button" style={{ background: 'transparent', color: 'var(--text)' }} href="/pull-requests">
+            <a className="button secondary" href="/pull-requests">
               Clear
             </a>
           )}
         </form>
       </PageHeader>
 
+      <p className="results-count">{result.total} matching pull requests</p>
       <div className="list">
         {result.data.length === 0 ? (
           <div className="panel">
-            <p>No matching pull requests found.</p>
+            <h2>{result.coverage === 'not_connected' ? 'Connect GitHub to get started' : 'No matching pull requests'}</h2>
+            <p>{result.coverage === 'not_connected' ? 'Your pull requests will appear here after your first sync.' : 'Try another search or clear the selected filters.'}</p>
+            <a className="button secondary" href={result.coverage === 'not_connected' ? '/settings/connections' : '/pull-requests'}>{result.coverage === 'not_connected' ? 'Connect GitHub' : 'Clear filters'}</a>
           </div>
         ) : (
           result.data.map(pr => (

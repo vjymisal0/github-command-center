@@ -15,7 +15,7 @@ export default async function ConnectionsPage({
   const hasAccounts = accounts.length > 0;
 
   return (
-    <section>
+    <section className="access-page">
       <div className="access-hero">
         <PageHeader eyebrow="Settings" title="GitHub access">
           <p>{hasAccounts ? 'GitHub is connected. Synced repositories and pull requests are live.' : 'No GitHub account is connected. Choose GitHub sign-in or paste a read-only token to start syncing.'}</p>
@@ -33,26 +33,26 @@ export default async function ConnectionsPage({
       {!hasAccounts && (
         <div className="connect-grid">
           <a className="connect-card primary" href="http://localhost:4000/auth/github">
-            <span>Recommended</span>
+            <span>Browser authorization</span>
             <strong>Sign in with GitHub</strong>
-            <p>Authorize GitHub in the browser. We use the returned access token to sync your repos and PRs.</p>
+            <p>Continue to GitHub to review access. OAuth requests broad repository permissions; use a fine-grained PAT for narrower access.</p>
             <em>Continue with GitHub →</em>
           </a>
           <div className="connect-card">
             <span>Manual fallback</span>
             <strong>Personal Access Token</strong>
-            <p>Use this if OAuth is blocked or you want to connect another GitHub account.</p>
+            <p>Choose selected repositories and read-only permissions in GitHub, then enter your token below.</p>
           </div>
         </div>
       )}
 
       <ConnectPatForm />
 
-      <div className="panel permissions-panel">
-        <h2>Required permissions</h2>
+      <details className="panel permissions-panel">
+        <summary>Token permission checklist</summary>
         <p>For PATs, use read-only access where GitHub lets you choose it.</p>
         <ul>{connections.permissionChecklist.map((item: string) => <li key={item}>{item}</li>)}</ul>
-      </div>
+      </details>
     </section>
   );
 }

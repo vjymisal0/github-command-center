@@ -1,0 +1,46 @@
+/* Shared contrast and spacing refinements; retain the existing dashboard layout. */
+:root {
+  --font-display: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+  --font-body: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --chart-open: #2563eb;
+  --chart-merged: #15803d;
+  --accent: #b42363;
+}
+[data-theme="dark"] {
+  --chart-open: #93b4ff;
+  --chart-merged: #6ee7b7;
+  --accent: #f9a8d4;
+}
+body { line-height: 1.6; }
+h1 { letter-spacing: -.035em; }
+small, input, select, textarea { font-family: var(--font-body); }
+.metric-value, .donut span, .donut-legend strong { font-variant-numeric: tabular-nums; }
+:where(a, button, input, select, summary):focus-visible { outline: 3px solid var(--chart-open); outline-offset: 4px; }
+.metric-card:hover, .card:hover, .row:hover { transform: none; box-shadow: var(--shadow-subtle); }
+.overview-panel { padding: 2rem; gap: 2rem; }
+.overview-panel p { max-width: 42ch; line-height: 1.7; }
+.donut { flex-shrink: 0; }
+.donut span { display: flex; flex-direction: column; justify-content: center; gap: .25rem; }
+.donut small { margin: 0; font-size: .6rem; letter-spacing: .03em; }
+.donut-legend { min-width: 150px; }
+.donut-legend span { padding: .5rem 0; border-bottom: 1px solid var(--line); font-weight: 500; }
+.donut-legend strong { margin-left: auto; color: var(--ink); }
+.filters { padding: 1rem; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-md); }
+.filters input { flex: 1; min-width: 180px; }
+.results-count { color: var(--muted); font-size: .85rem; }
+.row > div { min-width: 0; }
+.row strong, .row small { overflow-wrap: anywhere; }
+.access-page .login { max-width: none; }
+.access-page .login input { width: 100%; min-width: 0; }
+.access-page .login .button { justify-self: start; }
+.permissions-panel summary { cursor: pointer; font-weight: 600; color: var(--ink); }
+[data-theme="dark"] .button.danger { background: #b91c1c !important; border-color: #ef4444 !important; color: #fff !important; }
+[data-theme="dark"] .connection-pill.connected { color: #6ee7b7; }
+[data-theme="dark"] .notice.success { color: #86efac; }
+[data-theme="dark"] .notice.danger { color: #fca5a5; }
+@media (max-width: 640px) {
+  .overview-panel { padding: 1.25rem; }
+  .donut-wrap { gap: 1rem; }
+  .filters > * { width: 100%; }
+  .topnav { flex-wrap: wrap; }
+}

@@ -1,4 +1,5 @@
 import './styles.css';
+import './refinements.css';
 import { ThemeToggle } from './components/theme-toggle';
 
 export const metadata = { title: 'OSS Tracker' };
