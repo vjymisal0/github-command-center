@@ -15,7 +15,7 @@ test('GET /health returns 200 and ok: true', async () => {
   await app.close();
 });
 
-test('GET /repositories returns list of accessible repositories', async () => {
+test('GET /repositories returns empty state before GitHub is connected', async () => {
   const app = await buildApp();
   const response = await app.inject({
     method: 'GET',
@@ -25,7 +25,8 @@ test('GET /repositories returns list of accessible repositories', async () => {
   assert.equal(response.statusCode, 200);
   const json = response.json();
   assert.ok(Array.isArray(json.data));
-  assert.ok(json.total > 0);
+  assert.equal(json.total, 0);
+  assert.equal(json.coverage, 'not_connected');
   await app.close();
 });
 

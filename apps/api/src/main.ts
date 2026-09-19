@@ -155,6 +155,12 @@ export async function buildApp(opts: { logger?: boolean } = {}) {
     return { id: user.id, email: user.email, name: user.name };
   }
 
+  async function connectionState(request: FastifyRequest) {
+    const user = await currentUser(request);
+    const userId = user?.id ?? 'memory_admin';
+    return { userId, connected: (memoryConnections.get(userId) ?? []).length > 0 };
+  }
+
   await prisma.user.upsert({
     where: { email: adminEmail },
     update: {},
@@ -588,6 +594,8 @@ export async function buildApp(opts: { logger?: boolean } = {}) {
   });
 
   app.get('/repositories', async request => {
+    const { connected } = await connectionState(request);
+    if (!connected) return { total: 0, data: [], coverage: 'not_connected' };
     const q = listQuery.parse(request.query);
     const data = memoryRepos.filter(repo =>
       (!q.search || contains(repo.name, q.search)) &&
@@ -605,6 +613,8 @@ export async function buildApp(opts: { logger?: boolean } = {}) {
   });
 
   app.get('/pull-requests', async request => {
+    const { connected } = await connectionState(request);
+    if (!connected) return { total: 0, data: [], coverage: 'not_connected' };
     const q = listQuery.parse(request.query);
     const data = memoryPrs.filter(pr =>
       (!q.search || contains(`${pr.title} ${pr.repo} ${pr.author}`, q.search)) &&
@@ -633,7 +643,9 @@ export async function buildApp(opts: { logger?: boolean } = {}) {
     };
   });
 
-  app.get('/inbox', async () => {
+  app.get('/inbox', async request => {
+    const { connected } = await connectionState(request);
+    if (!connected) return { total: 0, data: [], coverage: 'not_connected' };
     const items = memoryPrs.flatMap(pr =>
       pr.reasons.map(reason => ({
         id: `${pr.id}-${reason}`,
@@ -648,15 +660,21 @@ export async function buildApp(opts: { logger?: boolean } = {}) {
     };
   });
 
-  app.get('/analytics/overview', async () => ({
-    openPullRequests: memoryPrs.filter(pr => pr.state === 'Open').length,
-    mergedPullRequests: Math.max(memoryPrs.filter(pr => pr.state === 'Merged').length, totalMergedPrsCount),
-    actionItems: memoryPrs.reduce((sum, pr) => sum + pr.reasons.length, 0),
-    failingChecks: memoryPrs.filter(pr => pr.ci === 'Failing').length,
-    repositories: memoryRepos.length,
-    lastSuccessfulSync: memoryConnections.size > 0 ? new Date().toISOString() : null,
-    coverage: 'live',
-  }));
+  app.get('/analytics/overview', async request => {
+    const { connected } = await connectionState(request);
+    if (!connected) {
+      return { openPullRequests: 0, mergedPullRequests: 0, actionItems: 0, failingChecks: 0, repositories: 0, lastSuccessfulSync: null, coverage: 'not_connected' };
+    }
+    return {
+      openPullRequests: memoryPrs.filter(pr => pr.state === 'Open').length,
+      mergedPullRequests: Math.max(memoryPrs.filter(pr => pr.state === 'Merged').length, totalMergedPrsCount),
+      actionItems: memoryPrs.reduce((sum, pr) => sum + pr.reasons.length, 0),
+      failingChecks: memoryPrs.filter(pr => pr.ci === 'Failing').length,
+      repositories: memoryRepos.length,
+      lastSuccessfulSync: new Date().toISOString(),
+      coverage: 'live',
+    };
+  });
 
   app.post('/webhooks/github', async (request, reply) => {
     const secret = process.env.GITHUB_WEBHOOK_SECRET ?? 'dev-webhook-secret';

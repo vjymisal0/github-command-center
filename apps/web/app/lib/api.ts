@@ -1,5 +1,3 @@
-import { prs, repos } from '../data';
-
 const apiBase = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
 export interface OverviewStats {
@@ -65,50 +63,37 @@ async function get<T>(path: string, fallback: T): Promise<T> {
   }
 }
 
+const emptyOverview: OverviewStats = {
+  openPullRequests: 0,
+  mergedPullRequests: 0,
+  actionItems: 0,
+  failingChecks: 0,
+  repositories: 0,
+  lastSuccessfulSync: null,
+  coverage: 'not_connected',
+};
+
 export const api = {
-  overview: () => get<OverviewStats>('/analytics/overview', {
-    openPullRequests: prs.filter(pr => pr.state === 'Open').length,
-    mergedPullRequests: (prs as readonly { state: string }[]).filter(pr => pr.state === 'Merged' || pr.state === 'Closed').length,
-    actionItems: prs.reduce((sum, pr) => sum + pr.reasons.length, 0),
-    failingChecks: (prs as readonly { ci: string }[]).filter(pr => pr.ci === 'Failing').length,
-    repositories: repos.length,
-    lastSuccessfulSync: null,
-    coverage: 'fixture',
-  }),
-  inbox: () => get<{ total: number; data: InboxItem[]; coverage: string }>('/inbox', {
-    total: prs.reduce((sum, pr) => sum + pr.reasons.length, 0),
-    data: prs.flatMap(pr => pr.reasons.map(reason => ({ id: `${pr.id}-${reason}`, reason, pullRequest: pr }))),
-    coverage: 'fallback',
-  }),
+  overview: () => get<OverviewStats>('/analytics/overview', emptyOverview),
+  inbox: () => get<{ total: number; data: InboxItem[]; coverage: string }>('/inbox', { total: 0, data: [], coverage: 'not_connected' }),
   pullRequests: (query?: { search?: string; state?: string; ci?: string }) => {
     const params = new URLSearchParams();
     if (query?.search) params.set('search', query.search);
     if (query?.state) params.set('state', query.state);
     if (query?.ci) params.set('ci', query.ci);
     const qs = params.toString() ? `?${params.toString()}` : '';
-    return get<{ total: number; data: PRRecord[]; coverage: string }>(`/pull-requests${qs}`, {
-      total: prs.length,
-      data: [...prs],
-      coverage: 'fallback',
-    });
+    return get<{ total: number; data: PRRecord[]; coverage: string }>(`/pull-requests${qs}`, { total: 0, data: [], coverage: 'not_connected' });
   },
-  pullRequest: (id: string) => get<PRRecord | null>(`/pull-requests/${id}`, (prs.find(pr => pr.id === id) as PRRecord) ?? null),
-  pullRequestDescription: (id: string) => get<{ id: string; description: string }>(`/pull-requests/${id}/description`, {
-    id,
-    description: (prs.find(pr => pr.id === id) as any)?.description || 'No description provided.',
-  }),
+  pullRequest: (id: string) => get<PRRecord | null>(`/pull-requests/${id}`, null),
+  pullRequestDescription: (id: string) => get<{ id: string; description: string }>(`/pull-requests/${id}/description`, { id, description: 'No description provided.' }),
   repositories: (query?: { search?: string; visibility?: string; relationship?: string }) => {
     const params = new URLSearchParams();
     if (query?.search) params.set('search', query.search);
     if (query?.visibility) params.set('visibility', query.visibility);
     if (query?.relationship) params.set('relationship', query.relationship);
     const qs = params.toString() ? `?${params.toString()}` : '';
-    return get<{ total: number; data: RepoRecord[]; coverage: string }>(`/repositories${qs}`, {
-      total: repos.length,
-      data: [...repos],
-      coverage: 'fallback',
-    });
+    return get<{ total: number; data: RepoRecord[]; coverage: string }>(`/repositories${qs}`, { total: 0, data: [], coverage: 'not_connected' });
   },
-  repository: (id: string) => get<RepoRecord | null>(`/repositories/${id}`, (repos.find(repo => repo.id === id) as RepoRecord) ?? null),
+  repository: (id: string) => get<RepoRecord | null>(`/repositories/${id}`, null),
   connections: () => get<ConnectionsResponse>('/connections', { data: [], permissionChecklist: [] }),
 };
