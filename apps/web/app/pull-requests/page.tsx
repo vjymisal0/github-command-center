@@ -4,10 +4,10 @@ import { api } from '../lib/api';
 export default async function PullRequestsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ search?: string; state?: string; ci?: string }>;
+  searchParams: Promise<{ search?: string; state?: string }>;
 }) {
-  const { search, state, ci } = await searchParams;
-  const result = await api.pullRequests({ search, state, ci });
+  const { search, state } = await searchParams;
+  const result = await api.pullRequests({ search, state });
 
   return (
     <section>
@@ -26,14 +26,8 @@ export default async function PullRequestsPage({
             <option value="Draft">Draft</option>
             <option value="Closed">Closed</option>
           </select>
-          <select name="ci" defaultValue={ci ?? ''} aria-label="CI status">
-            <option value="">All CI</option>
-            <option value="Passing">Passing</option>
-            <option value="Failing">Failing</option>
-            <option value="Pending">Pending</option>
-          </select>
           <button className="button" type="submit">Filter</button>
-          {(search || state || ci) && (
+          {(search || state) && (
             <a className="button" style={{ background: 'transparent', color: 'var(--text)' }} href="/pull-requests">
               Clear
             </a>
@@ -54,7 +48,7 @@ export default async function PullRequestsPage({
                 <small>{pr.repo} #{pr.number} · {pr.author} · {pr.updated}</small>
               </div>
               <span>
-                <Status>{pr.state}</Status> <Status>{pr.ci}</Status>
+                <Status>{pr.state}</Status>
               </span>
             </a>
           ))

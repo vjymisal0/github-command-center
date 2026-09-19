@@ -11,7 +11,6 @@ export default async function OverviewPage() {
 
   const openPRs = overview.openPullRequests;
   const actionItems = overview.actionItems;
-  const failingChecks = overview.failingChecks;
   
   // Real merged PR count from overview or PR data
   const mergedPRs = overview.mergedPullRequests ?? pullRequestsData.data.filter(
@@ -121,31 +120,6 @@ export default async function OverviewPage() {
             <div className="metric-value" style={{ color: '#7c3aed' }}>{actionItems}</div>
           </div>
           <p className="metric-description">Pull requests waiting for your review or requested changes</p>
-        </a>
-
-        {/* 4. Failing Checks */}
-        <a className="metric-card" href="/pull-requests?ci=Failing">
-          <div>
-            <div className="metric-header">
-              <span className="metric-label">Failing Checks</span>
-              <div
-                className="metric-icon-box"
-                style={{
-                  background: 'rgba(220, 38, 38, 0.1)',
-                  color: '#dc2626',
-                  borderColor: 'rgba(220, 38, 38, 0.25)',
-                }}
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
-                  <line x1="12" y1="9" x2="12" y2="13" />
-                  <line x1="12" y1="17" x2="12.01" y2="17" />
-                </svg>
-              </div>
-            </div>
-            <div className="metric-value" style={{ color: '#dc2626' }}>{failingChecks}</div>
-          </div>
-          <p className="metric-description">PRs with failing continuous integration or checks</p>
         </a>
       </div>
 

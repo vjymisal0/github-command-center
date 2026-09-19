@@ -47,11 +47,6 @@ export default async function PullRequestDetail({ params }: { params: Promise<{ 
             <Status>{pr.state}</Status>
           </dd>
 
-          <dt>CI Checks</dt>
-          <dd>
-            <Status>{pr.ci}</Status>
-          </dd>
-
           <dt>Review status</dt>
           <dd>
             <Status>{pr.review}</Status>
