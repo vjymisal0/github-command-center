@@ -8,7 +8,7 @@ COPY packages ./packages
 COPY apps/worker ./apps/worker
 COPY tsconfig.json ./
 RUN npm install
-RUN npm run build -w packages/shared
+RUN rm -f packages/shared/tsconfig.tsbuildinfo && npm run build -w packages/shared
 RUN npm run build -w apps/worker
 
 FROM base AS runner
