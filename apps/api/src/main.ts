@@ -174,7 +174,7 @@ export async function buildApp(opts: { logger?: boolean } = {}) {
     where: { email: adminEmail },
     update: {},
     create: { email: adminEmail, name: 'Demo Admin', passwordHash: hashPassword(adminPassword) },
-  }).catch(error => {
+  }).catch((error: unknown) => {
     dbAvailable = false;
     app.log.warn({ error }, 'database unavailable; using in-memory auth fallback');
   });
@@ -233,7 +233,7 @@ export async function buildApp(opts: { logger?: boolean } = {}) {
       const records = await prisma.gitHubConnection.findMany({
         where: { userId, status: 'ACTIVE' },
       });
-      dbConns = records.map(r => ({ type: r.type, status: r.status.toLowerCase(), id: r.id }));
+      dbConns = records.map((r: { type: string; status: string; id: string }) => ({ type: r.type, status: r.status.toLowerCase(), id: r.id }));
     } catch {
       dbAvailable = false;
       dbConns = userConns.map(r => ({ type: r.type, status: r.status.toLowerCase(), id: r.id }));
