@@ -1,1 +1,1 @@
-export { prs, repos } from '@gcc/shared/fixtures';
+export { prs, repos } from '@gcc/shared';
