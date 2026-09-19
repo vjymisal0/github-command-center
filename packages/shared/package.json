@@ -19,9 +19,5 @@
   },
   "devDependencies": {
     "typescript": "^5.7.2"
-  },
-  "exports": {
-    ".": "./dist/index.js",
-    "./fixtures": "./dist/fixtures.js"
   }
 }
