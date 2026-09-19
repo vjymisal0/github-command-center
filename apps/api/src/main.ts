@@ -335,15 +335,20 @@ export async function buildApp(opts: { logger?: boolean } = {}) {
       repo.prs = newPrs.filter(p => p.repo.toLowerCase() === repo.name.toLowerCase()).length;
     });
 
-    // Ingest live records
+    // Ingest live records — explicitly purge mock fixtures once real account is synced
+    const fixtureIds = new Set(fixturePrs.map(f => f.id));
+    const fixtureRepoIds = new Set(fixtureRepos.map(f => f.id));
+
     if (newRepos.length > 0) {
-      const existingNames = new Set(newRepos.map(nr => nr.name));
-      memoryRepos = [...newRepos, ...memoryRepos.filter(er => !existingNames.has(er.name))];
+      const liveExisting = memoryRepos.filter(er => !fixtureRepoIds.has(er.id));
+      const newNames = new Set(newRepos.map(nr => nr.name));
+      memoryRepos = [...newRepos, ...liveExisting.filter(er => !newNames.has(er.name))];
     }
 
     if (newPrs.length > 0) {
-      const existingIds = new Set(newPrs.map(np => np.id));
-      memoryPrs = [...newPrs, ...memoryPrs.filter(ep => !existingIds.has(ep.id))];
+      const liveExisting = memoryPrs.filter(ep => !fixtureIds.has(ep.id));
+      const newIds = new Set(newPrs.map(np => np.id));
+      memoryPrs = [...newPrs, ...liveExisting.filter(ep => !newIds.has(ep.id))];
     }
 
     if (log) {
