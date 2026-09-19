@@ -1,3 +1,5 @@
+import { cookies } from 'next/headers';
+
 const apiBase = process.env.NEXT_PUBLIC_API_URL ?? 'http://127.0.0.1:4000';
 
 export interface OverviewStats {
@@ -55,7 +57,11 @@ export interface ConnectionsResponse {
 
 async function get<T>(path: string, fallback: T): Promise<T> {
   try {
-    const res = await fetch(`${apiBase}${path}`, { cache: 'no-store' });
+    const cookieHeader = (await cookies()).toString();
+    const res = await fetch(`${apiBase}${path}`, {
+      cache: 'no-store',
+      headers: cookieHeader ? { cookie: cookieHeader } : undefined,
+    });
     if (!res.ok) return fallback;
     return await res.json() as T;
   } catch {

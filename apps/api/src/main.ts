@@ -146,8 +146,10 @@ export async function buildApp(opts: { logger?: boolean } = {}) {
     try {
       if (!dbAvailable) throw new Error('database disabled');
       const session = await prisma.session.findUnique({ where: { id: sid }, include: { user: true } });
-      if (!session || session.expiresAt < new Date()) return null;
-      return session.user;
+      if (session && session.expiresAt >= new Date()) return session.user;
+      const memoryEmail = memorySessions.get(sid);
+      if (memoryEmail) return { id: 'memory_admin', email: memoryEmail, name: memoryEmail.split('@')[0] };
+      return null;
     } catch {
       dbAvailable = false;
       const email = memorySessions.get(sid);
