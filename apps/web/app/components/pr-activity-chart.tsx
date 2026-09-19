@@ -82,8 +82,8 @@ export function PrActivityChart({
                 fontWeight: 600,
                 borderRadius: 'var(--radius-sm)',
                 border: '1px solid',
-                borderColor: range === r ? 'var(--pink-accent)' : 'var(--line)',
-                background: range === r ? 'var(--pink-accent)' : 'var(--card)',
+                borderColor: range === r ? 'var(--ink)' : 'var(--line)',
+                background: range === r ? 'var(--ink)' : 'var(--card)',
                 color: range === r ? '#ffffff' : 'var(--muted)',
                 cursor: 'pointer',
               }}

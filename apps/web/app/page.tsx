@@ -74,11 +74,11 @@ export default async function OverviewPage() {
       {/* 4 Dashboard Metric Cards */}
       <div className="grid">
         {/* 1. Open PRs */}
-        <a className="metric-card card-pink" href="/pull-requests?state=Open">
+        <a className="metric-card" href="/pull-requests?state=Open">
           <div>
             <div className="metric-header">
               <span className="metric-label">Open PRs</span>
-              <div className="metric-icon-box" style={{ background: 'var(--pink-bg)', color: 'var(--pink-accent)' }}>
+              <div className="metric-icon-box">
                 {/* Git Pull Request Icon */}
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="18" cy="18" r="3" />
@@ -94,11 +94,11 @@ export default async function OverviewPage() {
         </a>
 
         {/* 2. Action Items */}
-        <a className="metric-card card-purple" href="/inbox">
+        <a className="metric-card" href="/inbox">
           <div>
             <div className="metric-header">
               <span className="metric-label">Action Items</span>
-              <div className="metric-icon-box" style={{ background: 'var(--purple-bg)', color: 'var(--purple-accent)' }}>
+              <div className="metric-icon-box">
                 {/* Inbox / Message Circle Icon */}
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="22 12 16 12 14 15 10 15 8 12 2 12" />
@@ -112,11 +112,11 @@ export default async function OverviewPage() {
         </a>
 
         {/* 3. Failing Checks */}
-        <a className="metric-card card-orange" href="/pull-requests?ci=Failing">
+        <a className="metric-card" href="/pull-requests?ci=Failing">
           <div>
             <div className="metric-header">
               <span className="metric-label">Failing Checks</span>
-              <div className="metric-icon-box" style={{ background: 'var(--orange-bg)', color: 'var(--orange-accent)' }}>
+              <div className="metric-icon-box">
                 {/* Alert Triangle Icon */}
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
@@ -131,11 +131,11 @@ export default async function OverviewPage() {
         </a>
 
         {/* 4. Merged PRs */}
-        <a className="metric-card card-green" href="/pull-requests">
+        <a className="metric-card" href="/pull-requests">
           <div>
             <div className="metric-header">
               <span className="metric-label">Merged PRs</span>
-              <div className="metric-icon-box" style={{ background: 'var(--green-bg)', color: 'var(--green-accent)' }}>
+              <div className="metric-icon-box">
                 {/* Git Merge Icon */}
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="18" cy="18" r="3" />
