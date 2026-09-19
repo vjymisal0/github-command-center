@@ -1,90 +1,51 @@
 # OSS Tracker
 
-> Open-source, self-hosted developer command center with an explainable, read-only Action Inbox.
-
-![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue)
-![Node](https://img.shields.io/badge/Node-22%2B-green)
-
----
+A self-hosted, read-only GitHub command center for repositories, pull requests, reviews, checks, and contribution activity.
 
 ## Features
 
-- **Action Inbox**: Deterministic rule classification highlighting PRs that require your attention (`REVIEW_REQUESTED`, `CHANGES_REQUESTED`, `CI_FAILED`, `WAITING_FOR_REVIEW`, `READY_TO_MERGE_CANDIDATE`).
-- **PR Explorer**: Searchable, filterable drill-down across open, draft, and reviewed pull requests.
-- **Repository Explorer**: Discovers and classifies repositories across multiple connected GitHub accounts (`Owned` vs `Collaborating`, `Public` vs `Private`).
-- **Zero Animations & High-Density UI**: Fast, distraction-free developer dashboard aesthetic without sluggish transitions or animations.
-- **Multi-Account Support**: Connect multiple GitHub accounts via fine-grained Personal Access Tokens (PAT).
-- **AES-256-GCM Credential Encryption**: Tokens are encrypted server-side with unique nonces and auth tags before storage.
-- **Read-Only Guarantee**: Strictly read-only in v1. No destructive merge buttons, comments, or workflow runs.
+- GitHub OAuth sign-in and fine-grained PAT fallback
+- User-scoped repository and pull-request discovery
+- Explainable action inbox
+- Read-only PR and repository explorers
+- Light and dark themes
+- Docker Compose deployment with PostgreSQL, Redis, API, web, and worker services
+- GitHub webhook endpoint and scheduled sync foundation
 
----
-
-## Quick Start with Docker Compose
-
-1. **Clone the repository**:
-   ```bash
-   git clone https://github.com/vjymisal0/github-command-center.git
-   cd github-command-center
-   ```
-
-2. **Configure environment**:
-   ```bash
-   cp .env.example .env
-   # Update SESSION_SECRET and CREDENTIAL_ENCRYPTION_KEY in .env
-   ```
-
-3. **Start services**:
-   ```bash
-   docker compose up -d
-   ```
-
-4. **Access the application**:
-   - Web UI: [http://localhost:3000](http://localhost:3000)
-   - API: [http://localhost:4000](http://localhost:4000)
-
----
-
-## Local Development
+## Local development
 
 ```bash
-# 1. Install dependencies
+cp .env.example .env
 npm install
-
-# 2. Start PostgreSQL & Redis
-docker compose up -d postgres redis
-
-# 3. Generate Prisma client
-npm run db:generate
-
-# 4. Run tests & typecheck
-npm test
-npm run typecheck
-
-# 5. Start development servers
-npm run dev -w apps/api
-npm run dev -w apps/web
-npm run dev -w apps/worker
+npm run dev
 ```
 
----
+Web runs on `http://localhost:3000`; API runs on `http://localhost:4000`.
 
-## Architecture
+## Production deployment
+
+```bash
+cp .env.example .env
+# Set strong secrets and public URLs in .env
+docker compose up -d --build
+```
+
+Put Caddy, Nginx, or another HTTPS reverse proxy in front of web and API. Keep PostgreSQL and Redis private. For OAuth, configure the GitHub OAuth App callback as:
 
 ```text
-Browser (Next.js UI - Port 3000)
-        │
-Fastify API (Port 4000) ────────────── PostgreSQL (Tenant Data & Encrypted Tokens)
-        │                                  │
-        ├── GitHub Connection Service      ├── AES-256-GCM Credential Store
-        ├── Deterministic Rule Classifier  ├── User Repository Access
-        └── Webhook Signature Ingress      └── Pull Requests & Action Items
-        │
-      BullMQ ─── Redis ─── Worker ─── GitHub REST/GraphQL API
+https://your-domain.example/auth/github/callback
 ```
 
----
+Required production variables include `PUBLIC_WEB_URL`, `PUBLIC_API_URL`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `GITHUB_OAUTH_CALLBACK_URL`, `SESSION_SECRET`, and `CREDENTIAL_ENCRYPTION_KEY`.
+
+## Scope
+
+OSS Tracker is intentionally read-only in v1. It does not merge pull requests, comment, edit repositories, browse source code, or rerun workflows.
+
+## Contributing
+
+Issues and pull requests are welcome. Keep changes focused, protect user isolation, and never commit credentials or private GitHub data.
 
 ## License
 
-[MIT License](./LICENSE) © 2026 Vijay Misal
+MIT. See [LICENSE](LICENSE).
