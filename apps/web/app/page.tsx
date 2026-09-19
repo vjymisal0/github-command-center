@@ -59,7 +59,6 @@ export default async function OverviewPage() {
         <a
           className="metric-card"
           href="/pull-requests?state=Open"
-          style={{ borderTop: '3px solid #2563eb' }}
         >
           <div>
             <div className="metric-header">
@@ -89,7 +88,6 @@ export default async function OverviewPage() {
         <a
           className="metric-card"
           href="/pull-requests?state=Merged"
-          style={{ borderTop: '3px solid #059669' }}
         >
           <div>
             <div className="metric-header">
@@ -118,7 +116,6 @@ export default async function OverviewPage() {
         <a
           className="metric-card"
           href="/pull-requests?ci=Failing"
-          style={{ borderTop: '3px solid #dc2626' }}
         >
           <div>
             <div className="metric-header">
@@ -147,7 +144,6 @@ export default async function OverviewPage() {
         <a
           className="metric-card"
           href="/repositories"
-          style={{ borderTop: '3px solid #7c3aed' }}
         >
           <div>
             <div className="metric-header">
