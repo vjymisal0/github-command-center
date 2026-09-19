@@ -73,19 +73,6 @@ export function ProfileMenu() {
           >
             GitHub Connections
           </a>
-          <a
-            href="/login"
-            style={{
-              display: 'block',
-              padding: '0.5rem 1rem',
-              fontSize: '0.85rem',
-              color: 'var(--muted)',
-              textDecoration: 'none',
-            }}
-            onClick={() => setOpen(false)}
-          >
-            Switch Account / Login
-          </a>
         </div>
       )}
     </div>
