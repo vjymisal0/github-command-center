@@ -3,16 +3,15 @@ import { Status } from './components';
 import { SyncButton } from './components/sync-button';
 
 export default async function OverviewPage() {
-  const [overview, inboxData, pullRequestsData, repositoriesData] = await Promise.all([
+  const [overview, inboxData, pullRequestsData] = await Promise.all([
     api.overview(),
     api.inbox(),
     api.pullRequests(),
-    api.repositories(),
   ]);
 
   const openPRs = overview.openPullRequests;
+  const actionItems = overview.actionItems;
   const failingChecks = overview.failingChecks;
-  const totalRepos = overview.repositories;
   
   // Real merged PR count from overview or PR data
   const mergedPRs = overview.mergedPullRequests ?? pullRequestsData.data.filter(
@@ -20,14 +19,7 @@ export default async function OverviewPage() {
   ).length;
 
   // Real data for Attention List: Top PRs requiring action
-  const attentionItems = inboxData.data.slice(0, 5);
-
-  // Real data for Top Repositories: sorted by active PR count
-  const topRepos = [...repositoriesData.data]
-    .sort((a, b) => b.prs - a.prs)
-    .slice(0, 6);
-  
-  const maxRepoPrs = Math.max(1, ...topRepos.map(r => r.prs));
+  const attentionItems = inboxData.data.slice(0, 8);
 
   return (
     <section>
@@ -46,20 +38,17 @@ export default async function OverviewPage() {
           <p className="eyebrow" style={{ margin: 0, marginBottom: '0.35rem' }}>Overview</p>
           <h1 style={{ margin: 0, marginBottom: '0.35rem' }}>Your GitHub work, simplified.</h1>
           <p style={{ margin: 0, color: 'var(--muted)', fontSize: '0.95rem' }}>
-            Track your pull requests, review requests, and repositories across accounts in one place.
+            Track your pull requests, review requests, and contributions across accounts in one place.
           </p>
         </div>
 
         <SyncButton initialLastSync={overview.lastSuccessfulSync} />
       </div>
 
-      {/* 4 Colorful Dashboard Metric Cards */}
+      {/* 4 Dashboard Metric Cards */}
       <div className="grid">
         {/* 1. Open PRs */}
-        <a
-          className="metric-card"
-          href="/pull-requests?state=Open"
-        >
+        <a className="metric-card" href="/pull-requests?state=Open">
           <div>
             <div className="metric-header">
               <span className="metric-label">Open PRs</span>
@@ -85,10 +74,7 @@ export default async function OverviewPage() {
         </a>
 
         {/* 2. Merged PRs */}
-        <a
-          className="metric-card"
-          href="/pull-requests?state=Merged"
-        >
+        <a className="metric-card" href="/pull-requests?state=Merged">
           <div>
             <div className="metric-header">
               <span className="metric-label">Merged PRs</span>
@@ -112,11 +98,33 @@ export default async function OverviewPage() {
           <p className="metric-description">Shipped &amp; merged open-source contributions</p>
         </a>
 
-        {/* 3. Failing Checks */}
-        <a
-          className="metric-card"
-          href="/pull-requests?ci=Failing"
-        >
+        {/* 3. Action Required */}
+        <a className="metric-card" href="/pull-requests">
+          <div>
+            <div className="metric-header">
+              <span className="metric-label">Action Required</span>
+              <div
+                className="metric-icon-box"
+                style={{
+                  background: 'rgba(124, 58, 237, 0.1)',
+                  color: '#7c3aed',
+                  borderColor: 'rgba(124, 58, 237, 0.25)',
+                }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 8v4" />
+                  <path d="M12 16h.01" />
+                  <circle cx="12" cy="12" r="9" />
+                </svg>
+              </div>
+            </div>
+            <div className="metric-value" style={{ color: '#7c3aed' }}>{actionItems}</div>
+          </div>
+          <p className="metric-description">Pull requests waiting for your review or requested changes</p>
+        </a>
+
+        {/* 4. Failing Checks */}
+        <a className="metric-card" href="/pull-requests?ci=Failing">
           <div>
             <div className="metric-header">
               <span className="metric-label">Failing Checks</span>
@@ -139,38 +147,10 @@ export default async function OverviewPage() {
           </div>
           <p className="metric-description">PRs with failing continuous integration or checks</p>
         </a>
-
-        {/* 4. Repositories */}
-        <a
-          className="metric-card"
-          href="/repositories"
-        >
-          <div>
-            <div className="metric-header">
-              <span className="metric-label">Repositories</span>
-              <div
-                className="metric-icon-box"
-                style={{
-                  background: 'rgba(124, 58, 237, 0.1)',
-                  color: '#7c3aed',
-                  borderColor: 'rgba(124, 58, 237, 0.25)',
-                }}
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z" />
-                  <path d="M6 6h10" />
-                  <path d="M6 10h10" />
-                </svg>
-              </div>
-            </div>
-            <div className="metric-value" style={{ color: '#7c3aed' }}>{totalRepos}</div>
-          </div>
-          <p className="metric-description">Accessible owned &amp; contributed repositories</p>
-        </a>
       </div>
 
       {/* Needs Your Attention Section */}
-      <div className="panel" style={{ marginBottom: '1.75rem' }}>
+      <div className="panel">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
           <div>
             <h2 style={{ margin: 0, fontSize: '1.2rem', color: 'var(--text)' }}>Needs Your Attention</h2>
@@ -208,97 +188,6 @@ export default async function OverviewPage() {
               </a>
             ))
           )}
-        </div>
-      </div>
-
-      {/* Top Repositories by Activity */}
-      <div className="panel">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-          <div>
-            <h2 style={{ margin: 0, fontSize: '1.25rem', color: 'var(--text)' }}>Top Repositories by Activity</h2>
-            <small style={{ color: 'var(--muted)', fontSize: '0.8rem' }}>Most active open-source and owned repositories</small>
-          </div>
-          <a href="/repositories" style={{ color: 'var(--accent)', fontSize: '0.85rem', fontWeight: 600, textDecoration: 'none' }}>
-            View all →
-          </a>
-        </div>
-
-        <div style={{ overflowX: 'auto' }}>
-          <table className="repo-table">
-            <thead>
-              <tr>
-                <th style={{ minWidth: '220px' }}>Repository</th>
-                <th>Relationship</th>
-                <th style={{ minWidth: '160px' }}>Activity</th>
-                <th style={{ textAlign: 'right' }}>Open PRs</th>
-              </tr>
-            </thead>
-            <tbody>
-              {topRepos.map(repo => {
-                const percent = Math.min(100, Math.round((repo.prs / maxRepoPrs) * 100));
-                return (
-                  <tr key={repo.id}>
-                    <td>
-                      <a
-                        href={`/repositories/${repo.id}`}
-                        style={{ textDecoration: 'none', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: '0.65rem' }}
-                      >
-                        <div
-                          style={{
-                            width: '28px',
-                            height: '28px',
-                            borderRadius: 'var(--radius-sm)',
-                            background: 'rgba(59, 130, 246, 0.08)',
-                            border: '1px solid rgba(59, 130, 246, 0.2)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            color: '#2563eb',
-                            flexShrink: 0,
-                          }}
-                        >
-                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z" />
-                            <path d="M6 6h10" />
-                            <path d="M6 10h10" />
-                          </svg>
-                        </div>
-                        <div>
-                          <strong style={{ display: 'block', fontSize: '0.875rem' }}>{repo.name}</strong>
-                          <small style={{ color: 'var(--muted)', fontSize: '0.75rem' }}>
-                            {repo.visibility} · Synced {repo.synced}
-                          </small>
-                        </div>
-                      </a>
-                    </td>
-                    <td>
-                      <Status>{repo.relationship}</Status>
-                    </td>
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                        <div className="activity-bar-bg" style={{ flex: 1, background: 'var(--line)', borderRadius: '999px', height: '6px' }}>
-                          <div
-                            style={{
-                              width: `${Math.max(10, percent)}%`,
-                              height: '100%',
-                              borderRadius: '999px',
-                              background: 'linear-gradient(90deg, #2563eb, #38bdf8)',
-                            }}
-                          />
-                        </div>
-                        <small style={{ color: 'var(--muted)', fontSize: '0.75rem', fontFamily: 'var(--font-mono)' }}>
-                          {repo.prs} PR{repo.prs !== 1 ? 's' : ''}
-                        </small>
-                      </div>
-                    </td>
-                    <td style={{ textAlign: 'right', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>
-                      {repo.prs}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
         </div>
       </div>
     </section>
