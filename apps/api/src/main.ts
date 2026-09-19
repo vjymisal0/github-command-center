@@ -2,6 +2,7 @@ import cookie from '@fastify/cookie';
 import helmet from '@fastify/helmet';
 import sensible from '@fastify/sensible';
 import { PrismaClient } from '@prisma/client';
+import { Octokit } from '@octokit/rest';
 import { prs, repos } from '@gcc/shared/fixtures';
 import Fastify, { type FastifyRequest } from 'fastify';
 import { randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
@@ -24,6 +25,7 @@ const listQuery = z.object({
   relationship: z.string().optional(),
 });
 const loginBody = z.object({ email: z.string().email(), password: z.string().min(1) });
+const patBody = z.object({ token: z.string().min(20) });
 
 function hashPassword(password: string) {
   return scryptSync(password, 'demo-static-salt', 32).toString('hex');
@@ -104,6 +106,28 @@ app.get('/connections', async () => ({
     'Actions read access when available',
   ],
 }));
+
+app.post('/connections/pat/test', async request => {
+  const { token } = patBody.parse(request.body);
+  const octokit = new Octokit({ auth: token });
+  try {
+    const [{ data: user }, { data: reposPage }, rate] = await Promise.all([
+      octokit.rest.users.getAuthenticated(),
+      octokit.rest.repos.listForAuthenticatedUser({ per_page: 1, affiliation: 'owner,collaborator,organization_member' }),
+      octokit.rest.rateLimit.get(),
+    ]);
+    return {
+      ok: true,
+      githubUser: { id: user.id, login: user.login, avatarUrl: user.avatar_url },
+      sampleRepository: reposPage[0] ? { id: reposPage[0].id, fullName: reposPage[0].full_name, private: reposPage[0].private } : null,
+      rateLimit: rate.data.rate,
+      nextStep: 'Token is valid. Saving encrypted PAT is the next implementation slice.',
+    };
+  } catch (error) {
+    request.log.warn({ error }, 'PAT validation failed');
+    return app.httpErrors.unauthorized('GitHub token validation failed');
+  }
+});
 
 app.get('/sync/status', async () => ({
   state: 'not_configured',
