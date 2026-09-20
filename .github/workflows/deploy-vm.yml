@@ -50,8 +50,11 @@ jobs:
           fi
 
           git -C "$APP_DIR" fetch --depth=1 origin "$DEPLOY_BRANCH"
-          git -C "$APP_DIR" checkout -B "$DEPLOY_BRANCH" "origin/$DEPLOY_BRANCH"
+          # The VM may contain a first deployment with no Git history. Keep secrets,
+          # remove only other untracked files, then restore the tracked checkout.
+          git -C "$APP_DIR" clean -fd -e .env -e .env.*
           git -C "$APP_DIR" reset --hard "origin/$DEPLOY_BRANCH"
+          git -C "$APP_DIR" checkout -B "$DEPLOY_BRANCH" "origin/$DEPLOY_BRANCH"
           docker compose -f "$APP_DIR/docker-compose.yml" up -d --build --remove-orphans
           docker image prune -f
           REMOTE
