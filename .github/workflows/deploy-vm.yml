@@ -1,0 +1,57 @@
+name: Deploy to Oracle VM
+
+on:
+  push:
+    branches: [feat/foundation-scaffold]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: oracle-vm-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy over SSH
+        env:
+          VM_HOST: ${{ secrets.OSS_VM_HOST }}
+          VM_USER: ${{ secrets.OSS_VM_USER }}
+          VM_SSH_KEY: ${{ secrets.OSS_VM_SSH_KEY }}
+          VM_KNOWN_HOSTS: ${{ secrets.OSS_VM_KNOWN_HOSTS }}
+          DEPLOY_BRANCH: feat/foundation-scaffold
+        run: |
+          set -euo pipefail
+          test -n "$VM_HOST"
+          test -n "$VM_USER"
+          test -n "$VM_SSH_KEY"
+          test -n "$VM_KNOWN_HOSTS"
+
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$VM_SSH_KEY" > ~/.ssh/oss-tracker-vm
+          printf '%s\n' "$VM_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/oss-tracker-vm ~/.ssh/known_hosts
+
+          ssh -i ~/.ssh/oss-tracker-vm -o IdentitiesOnly=yes "$VM_USER@$VM_HOST" \
+            "DEPLOY_BRANCH='$DEPLOY_BRANCH' REPOSITORY='${{ github.repository }}' bash -s" <<'REMOTE'
+          set -euo pipefail
+          APP_DIR=/home/ubuntu/oss-tracker
+          REPO_URL="https://github.com/${REPOSITORY}.git"
+
+          mkdir -p "$APP_DIR"
+          if [ ! -d "$APP_DIR/.git" ]; then
+            git -C "$APP_DIR" init
+            git -C "$APP_DIR" remote add origin "$REPO_URL"
+          elif ! git -C "$APP_DIR" remote get-url origin >/dev/null 2>&1; then
+            git -C "$APP_DIR" remote add origin "$REPO_URL"
+          fi
+
+          git -C "$APP_DIR" fetch --depth=1 origin "$DEPLOY_BRANCH"
+          git -C "$APP_DIR" checkout -B "$DEPLOY_BRANCH" "origin/$DEPLOY_BRANCH"
+          git -C "$APP_DIR" reset --hard "origin/$DEPLOY_BRANCH"
+          docker compose -f "$APP_DIR/docker-compose.yml" up -d --build --remove-orphans
+          docker image prune -f
+          REMOTE
