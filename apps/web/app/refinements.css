@@ -17,6 +17,11 @@ small, input, select, textarea { font-family: var(--font-body); }
 .metric-value, .donut span, .donut-legend strong { font-variant-numeric: tabular-nums; }
 :where(a, button, input, select, summary):focus-visible { outline: 3px solid var(--chart-open); outline-offset: 4px; }
 .metric-card:hover, .card:hover, .row:hover { transform: none; box-shadow: var(--shadow-subtle); }
+.overview-info-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.25rem; margin: 1.5rem 0; }
+.overview-info-card { padding: 1.35rem 1.5rem; }
+.overview-info-card h2 { margin: 0 0 .5rem; font-size: 1.2rem; }
+.overview-info-card p:not(.eyebrow) { margin: 0; max-width: 52ch; }
+.overview-info-card a { display: inline-block; margin-top: .85rem; color: var(--ink); font-weight: 600; }
 .overview-panel { padding: 2rem; gap: 2rem; }
 .overview-panel p { max-width: 42ch; line-height: 1.7; }
 .donut { flex-shrink: 0; }
@@ -39,6 +44,7 @@ small, input, select, textarea { font-family: var(--font-body); }
 [data-theme="dark"] .notice.success { color: #86efac; }
 [data-theme="dark"] .notice.danger { color: #fca5a5; }
 @media (max-width: 640px) {
+  .overview-info-grid { grid-template-columns: 1fr; }
   .overview-panel { padding: 1.25rem; }
   .donut-wrap { gap: 1rem; }
   .filters > * { width: 100%; }
