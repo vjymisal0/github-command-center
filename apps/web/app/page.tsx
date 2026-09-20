@@ -38,6 +38,20 @@ export default async function OverviewPage() {
         </div>
       )}
 
+      <div className="overview-info-grid" aria-label="About OSS Tracker">
+        <article className="card overview-info-card">
+          <p className="eyebrow">What it does</p>
+          <h2>One calm view of your open-source work.</h2>
+          <p>OSS Tracker brings together your pull requests, reviews, checks, and repositories so you can quickly see what needs attention.</p>
+        </article>
+        <article className="card overview-info-card">
+          <p className="eyebrow">Your GitHub access</p>
+          <h2>Designed for read-only visibility.</h2>
+          <p>Use a fine-grained, read-only token with selected repositories. OSS Tracker only reads and syncs GitHub data—it does not push code, merge PRs, comment, or change your repositories. Tokens are encrypted when stored in the database, and you can revoke access from GitHub at any time.</p>
+          <a href="/settings/connections">Review GitHub access →</a>
+        </article>
+      </div>
+
       <div className="metrics-simple">
         {cards.map(([label, value, href, icon]) => (
           <a className="metric-card simple" href={String(href)} key={String(label)}>
