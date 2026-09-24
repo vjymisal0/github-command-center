@@ -1,7 +1,5 @@
 /* Shared contrast and spacing refinements; retain the existing dashboard layout. */
 :root {
-  --font-display: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
-  --font-body: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
   --chart-open: #2563eb;
   --chart-merged: #15803d;
   --accent: #b42363;
@@ -26,6 +24,9 @@ small, input, select, textarea { font-family: var(--font-body); }
 .donut-legend span { padding: .5rem 0; border-bottom: 1px solid var(--line); font-weight: 500; }
 .donut-legend strong { margin-left: auto; color: var(--ink); }
 .filters { padding: 1rem; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-md); }
+.filter-chip { display: inline-flex; align-items: center; min-height: 38px; padding: .5rem .8rem; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--text); font: 700 .78rem var(--font-mono); text-decoration: none; text-transform: uppercase; letter-spacing: .025em; }
+.filter-chip:hover { border-color: var(--pink-accent); }
+.filter-chip.active { background: var(--pink-accent); border-color: var(--pink-accent); color: #fff; }
 .filters input { flex: 1; min-width: 180px; }
 .results-count { color: var(--muted); font-size: .85rem; }
 .row > div { min-width: 0; }

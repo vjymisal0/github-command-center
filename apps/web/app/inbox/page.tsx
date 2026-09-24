@@ -19,19 +19,12 @@ export default async function InboxPage({
   return (
     <section>
       <PageHeader eyebrow="Inbox" title="Action inbox">
-        <p>
-          Explainable, deterministic rules alerting you to items requiring action. One pull request can appear under multiple action categories.
-        </p>
+        <p>Pull requests that need attention.</p>
 
         {allReasons.length > 0 && (
           <div className="filters" style={{ marginTop: '1rem' }}>
             <a
-              className="button"
-              style={{
-                background: !reason ? 'var(--accent)' : 'var(--card)',
-                color: !reason ? '#ffffff' : 'var(--text)',
-                borderColor: !reason ? 'var(--accent)' : 'var(--line)',
-              }}
+              className={`filter-chip ${!reason ? 'active' : ''}`}
               href="/inbox"
             >
               All ({inbox.total})
@@ -39,12 +32,7 @@ export default async function InboxPage({
             {allReasons.map(r => (
               <a
                 key={r}
-                className="button"
-                style={{
-                  background: reason?.toLowerCase() === r.toLowerCase() ? 'var(--accent)' : 'var(--card)',
-                  color: reason?.toLowerCase() === r.toLowerCase() ? '#ffffff' : 'var(--text)',
-                  borderColor: reason?.toLowerCase() === r.toLowerCase() ? 'var(--accent)' : 'var(--line)',
-                }}
+                className={`filter-chip ${reason?.toLowerCase() === r.toLowerCase() ? 'active' : ''}`}
                 href={`/inbox?reason=${r}`}
               >
                 {r.replaceAll('_', ' ')}
