@@ -4,7 +4,6 @@ export function middleware(request: NextRequest) {
   const signedIn = request.cookies.has('sid');
   const login = request.nextUrl.pathname === '/login';
   if (!signedIn && !login) return NextResponse.redirect(new URL('/login', request.url));
-  if (signedIn && login) return NextResponse.redirect(new URL('/', request.url));
   return NextResponse.next();
 }
 

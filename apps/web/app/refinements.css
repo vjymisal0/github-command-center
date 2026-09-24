@@ -6,11 +6,6 @@
   --chart-merged: #15803d;
   --accent: #b42363;
 }
-[data-theme="dark"] {
-  --chart-open: #93b4ff;
-  --chart-merged: #6ee7b7;
-  --accent: #f9a8d4;
-}
 body { line-height: 1.6; }
 h1 { letter-spacing: -.035em; }
 small, input, select, textarea { font-family: var(--font-body); }
@@ -39,10 +34,6 @@ small, input, select, textarea { font-family: var(--font-body); }
 .access-page .login input { width: 100%; min-width: 0; }
 .access-page .login .button { justify-self: start; }
 .permissions-panel summary { cursor: pointer; font-weight: 600; color: var(--ink); }
-[data-theme="dark"] .button.danger { background: #b91c1c !important; border-color: #ef4444 !important; color: #fff !important; }
-[data-theme="dark"] .connection-pill.connected { color: #6ee7b7; }
-[data-theme="dark"] .notice.success { color: #86efac; }
-[data-theme="dark"] .notice.danger { color: #fca5a5; }
 @media (max-width: 640px) {
   .overview-info-grid { grid-template-columns: 1fr; }
   .overview-panel { padding: 1.25rem; }
