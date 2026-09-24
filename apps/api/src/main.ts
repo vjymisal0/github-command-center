@@ -156,8 +156,8 @@ export async function buildApp(opts: { logger?: boolean } = {}) {
       const tag = new Uint8Array(encrypted.tag);
       await tx.encryptedCredential.upsert({ where: { connectionId: id }, update: { keyVersion: encrypted.keyVersion, ciphertext, nonce, tag }, create: { connectionId: id, keyVersion: encrypted.keyVersion, ciphertext, nonce, tag } });
     });
-    const synced = await syncGitHubData(userId, id, token, request.log);
-    return { ok: true, user: { login: synced.login, id: synced.id }, counts: { repositories: synced.repositories, pullRequests: synced.pullRequests } };
+    void syncGitHubData(userId, id, token, request.log).catch(error => request.log.error({ error, userId, connectionId: id }, 'GitHub sync failed'));
+    return reply.code(202).send({ ok: true, state: 'syncing', user: { login: ghUser.login, id: ghUser.id } });
   });
   app.post('/connections/:id/delete', async request => {
     const { id } = request.params as { id: string }; const userId = request.authUser!.id;
@@ -168,12 +168,16 @@ export async function buildApp(opts: { logger?: boolean } = {}) {
   });
   app.delete('/connections/:id', async request => { const { id } = request.params as { id: string }; const userId = request.authUser!.id; const c = await prisma.gitHubConnection.findFirst({ where: { id, userId } }); if (!c) return app.httpErrors.notFound('Connection not found'); await prisma.gitHubConnection.delete({ where: { id } }); return { ok: true }; });
 
-  app.post('/sync', async request => {
+  app.post('/sync', async (request, reply) => {
     const userId = request.authUser!.id;
     const connections = await prisma.gitHubConnection.findMany({ where: { userId, status: 'ACTIVE' }, include: { credential: true } });
-    let syncedAccounts = 0;
-    for (const c of connections) if (c.credential) { const token = decryptCredential({ ciphertext: Buffer.from(c.credential.ciphertext), nonce: Buffer.from(c.credential.nonce), tag: Buffer.from(c.credential.tag) }); await syncGitHubData(userId, c.id, token, request.log); syncedAccounts++; }
-    return { ok: true, syncedAccounts };
+    let queuedAccounts = 0;
+    for (const c of connections) if (c.credential) {
+      const token = decryptCredential({ ciphertext: Buffer.from(c.credential.ciphertext), nonce: Buffer.from(c.credential.nonce), tag: Buffer.from(c.credential.tag) });
+      void syncGitHubData(userId, c.id, token, request.log).catch(error => request.log.error({ error, userId, connectionId: c.id }, 'GitHub sync failed'));
+      queuedAccounts++;
+    }
+    return reply.code(202).send({ ok: true, state: 'syncing', queuedAccounts });
   });
   app.get('/sync/status', async request => { const count = await prisma.gitHubConnection.count({ where: { userId: request.authUser!.id, status: 'ACTIVE' } }); const last = await prisma.userRepositoryAccess.findFirst({ where: { userId: request.authUser!.id, status: 'active' }, orderBy: { lastVerifiedAt: 'desc' }, select: { lastVerifiedAt: true } }); return { state: count ? 'synced' : 'not_configured', message: count ? `${count} GitHub account(s) active.` : 'Connect GitHub before first sync.', lastSuccessfulSync: last?.lastVerifiedAt?.toISOString() ?? null }; });
 
