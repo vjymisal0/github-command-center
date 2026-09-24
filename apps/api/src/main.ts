@@ -163,7 +163,7 @@ export async function buildApp(opts: { logger?: boolean } = {}) {
     const state = randomBytes(24).toString('hex');
     reply.setCookie('oauth_state', state, { httpOnly: true, sameSite: 'lax', secure: production, path: '/', maxAge: 600 });
     const callback = process.env.GITHUB_OAUTH_CALLBACK_URL ?? `${webUrl}/api/auth/github/callback`;
-    const params = new URLSearchParams({ client_id: clientId, redirect_uri: callback, scope: 'read:user user:email repo', state });
+    const params = new URLSearchParams({ client_id: clientId, redirect_uri: callback, scope: 'read:user user:email', state });
     return reply.redirect(`https://github.com/login/oauth/authorize?${params}`);
   });
   app.get('/auth/github/callback', async (request, reply) => {
@@ -189,16 +189,9 @@ export async function buildApp(opts: { logger?: boolean } = {}) {
     user = user
       ? await prisma.user.update({ where: { id: user.id }, data: { githubUserId: BigInt(github.id), githubLogin: github.login, name: user.name ?? github.name ?? github.login } })
       : await prisma.user.create({ data: { email: normalizedEmail, name: github.name ?? github.login, githubUserId: BigInt(github.id), githubLogin: github.login } });
-    const connectionId = `oauth_${user.id}_${github.id}`;
-    const encrypted = encryptCredential(tokenBody.access_token);
-    await prisma.$transaction(async tx => {
-      await tx.gitHubConnection.upsert({ where: { id: connectionId }, update: { status: 'ACTIVE', username: github.login, githubUserId: BigInt(github.id) }, create: { id: connectionId, userId: user.id, type: 'PAT', status: 'ACTIVE', username: github.login, githubUserId: BigInt(github.id), scopes: ['repo', 'read:user', 'user:email'] } });
-      await tx.encryptedCredential.upsert({ where: { connectionId }, update: { keyVersion: encrypted.keyVersion, ciphertext: new Uint8Array(encrypted.ciphertext), nonce: new Uint8Array(encrypted.nonce), tag: new Uint8Array(encrypted.tag) }, create: { connectionId, keyVersion: encrypted.keyVersion, ciphertext: new Uint8Array(encrypted.ciphertext), nonce: new Uint8Array(encrypted.nonce), tag: new Uint8Array(encrypted.tag) } });
-    });
     const sid = randomUUID();
     await prisma.session.create({ data: { id: sid, userId: user.id, expiresAt: new Date(Date.now() + 30 * 86400000) } });
     sessionCookie(reply, sid);
-    void syncGitHubData(user.id, connectionId, tokenBody.access_token, request.log).catch(error => request.log.error({ error, userId: user.id, connectionId }, 'GitHub OAuth sync failed'));
     return reply.redirect(webUrl);
   });
   app.post('/auth/register', async (request, reply) => {
