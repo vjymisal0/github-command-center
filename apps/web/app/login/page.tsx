@@ -27,8 +27,8 @@ export default function LoginPage() {
       <div className="auth-divider"><span>or use email</span></div>
       <form onSubmit={submit} className="login">
         <label>Email<input name="email" type="email" autoComplete="email" required /></label>
-        <label>Password<input name="password" type="password" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} minLength={8} required /></label>
-        {mode === 'register' && <label>Confirm password<input name="confirmPassword" type="password" autoComplete="new-password" minLength={8} required /></label>}
+        <label>Password<input name="password" type="password" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} minLength={6} required /></label>
+        {mode === 'register' && <label>Confirm password<input name="confirmPassword" type="password" autoComplete="new-password" minLength={6} required /></label>}
         {error && <div className="notice danger" role="alert">{error}</div>}
         <button className="button" type="submit" disabled={loading}>{loading ? 'Please wait…' : mode === 'login' ? 'Sign in' : 'Create account'}</button>
       </form>

@@ -19,7 +19,7 @@ const prisma = new PrismaClient();
 const webUrl = process.env.PUBLIC_WEB_URL ?? 'http://localhost:3000';
 const production = process.env.NODE_ENV === 'production';
 const listQuery = z.object({ search: z.string().max(200).optional(), state: z.string().optional(), ci: z.string().optional(), visibility: z.string().optional(), relationship: z.string().optional() });
-const credentialsBody = z.object({ email: z.string().email(), password: z.string().min(8).max(200) });
+const credentialsBody = z.object({ email: z.string().email(), password: z.string().min(6).max(200) });
 const patBody = z.object({ token: z.string().min(20).max(500) });
 
 type AuthUser = { id: string; email: string; name: string | null };
