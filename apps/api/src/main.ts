@@ -50,6 +50,16 @@ async function requireEncryptionKey() {
 
 async function syncGitHubData(userId: string, connectionId: string, token: string, log: FastifyRequest['log']) {
   const octokit = new Octokit({ auth: token });
+  async function fetchRepository(owner: string, repo: string) {
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try { return (await octokit.rest.repos.get({ owner, repo })).data; }
+      catch (error) {
+        if (attempt === 3) { log.warn({ error, owner, repo }, 'Skipping repository after GitHub retries'); return null; }
+        await new Promise(resolve => setTimeout(resolve, attempt * 500));
+      }
+    }
+    return null;
+  }
   const { data: ghUser } = await octokit.rest.users.getAuthenticated();
   const repos = await octokit.paginate(octokit.rest.repos.listForAuthenticatedUser, { per_page: 100, affiliation: 'owner,collaborator,organization_member', sort: 'updated' });
   const seenRepositoryIds: string[] = [];
@@ -83,7 +93,8 @@ async function syncGitHubData(userId: string, connectionId: string, token: strin
     const [owner, repoName] = item.repository_url.replace('https://api.github.com/repos/', '').split('/');
     let record = await prisma.repository.findUnique({ where: { owner_name: { owner, name: `${owner}/${repoName}` } } });
     if (!record) {
-      const { data: repo } = await octokit.rest.repos.get({ owner, repo: repoName });
+      const repo = await fetchRepository(owner, repoName);
+      if (!repo) continue;
       record = await prisma.repository.upsert({
         where: { githubId: BigInt(repo.id) },
         update: { owner, name: repo.full_name, visibility: (repo.private ? 'PRIVATE' : 'PUBLIC') as RepositoryVisibility },
