@@ -92,14 +92,14 @@ model UserRepositoryAccess {
   id           String @id @default(cuid())
   userId       String
   repositoryId String
-  connectionId String?
+  connectionId String
   relationships String[] @default([])
   status       String @default("active")
   lastVerifiedAt DateTime?
   user         User @relation(fields: [userId], references: [id], onDelete: Cascade)
   repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
-  connection   GitHubConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
-  @@unique([userId, repositoryId])
+  connection   GitHubConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  @@unique([userId, repositoryId, connectionId])
 }
 
 model PullRequest {

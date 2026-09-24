@@ -64,7 +64,7 @@ async function syncGitHubData(userId: string, connectionId: string, token: strin
     seenRepositoryIds.push(record.id);
     const relationship = repo.owner.login.toLowerCase() === ghUser.login.toLowerCase() ? 'OWNED' : 'COLLABORATING';
     await prisma.userRepositoryAccess.upsert({
-      where: { userId_repositoryId: { userId, repositoryId: record.id } },
+      where: { userId_repositoryId_connectionId: { userId, repositoryId: record.id, connectionId } },
       update: { connectionId, relationships: [relationship], status: 'active', lastVerifiedAt: new Date() },
       create: { userId, repositoryId: record.id, connectionId, relationships: [relationship], status: 'active', lastVerifiedAt: new Date() },
     });
@@ -151,7 +151,10 @@ export async function buildApp(opts: { logger?: boolean } = {}) {
     const encrypted = encryptCredential(token);
     await prisma.$transaction(async tx => {
       await tx.gitHubConnection.upsert({ where: { id }, update: { status: 'ACTIVE', username: ghUser.login, githubUserId: BigInt(ghUser.id) }, create: { id, userId, type: 'PAT', status: 'ACTIVE', username: ghUser.login, githubUserId: BigInt(ghUser.id), scopes: [] } });
-      await tx.encryptedCredential.upsert({ where: { connectionId: id }, update: { keyVersion: encrypted.keyVersion, ciphertext: encrypted.ciphertext, nonce: encrypted.nonce, tag: encrypted.tag }, create: { connectionId: id, keyVersion: encrypted.keyVersion, ciphertext: encrypted.ciphertext, nonce: encrypted.nonce, tag: encrypted.tag } });
+      const ciphertext = new Uint8Array(encrypted.ciphertext);
+      const nonce = new Uint8Array(encrypted.nonce);
+      const tag = new Uint8Array(encrypted.tag);
+      await tx.encryptedCredential.upsert({ where: { connectionId: id }, update: { keyVersion: encrypted.keyVersion, ciphertext, nonce, tag }, create: { connectionId: id, keyVersion: encrypted.keyVersion, ciphertext, nonce, tag } });
     });
     const synced = await syncGitHubData(userId, id, token, request.log);
     return { ok: true, user: { login: synced.login, id: synced.id }, counts: { repositories: synced.repositories, pullRequests: synced.pullRequests } };
@@ -186,7 +189,7 @@ export async function buildApp(opts: { logger?: boolean } = {}) {
   app.get('/inbox', async request => { const records = await prisma.actionItem.findMany({ where: { userId: request.authUser!.id, resolvedAt: null, pullRequest: scopedPrWhere(request.authUser!.id) }, include: { pullRequest: { include: { repository: true, actionItems: { where: { userId: request.authUser!.id, resolvedAt: null } } } } }, orderBy: { lastSeenAt: 'desc' } }); return { total: records.length, data: records.map(a => ({ id: a.id, reason: a.reason, pullRequest: prShape(a.pullRequest) })), coverage: records.length ? 'live' : 'not_connected' }; });
   app.get('/analytics/overview', async request => { const userId = request.authUser!.id; const where = scopedPrWhere(userId); const [openPullRequests, mergedPullRequests, repositories, actionItems, failingChecks, last] = await Promise.all([prisma.pullRequest.count({ where: { ...where, state: 'OPEN' } }), prisma.pullRequest.count({ where: { ...where, state: 'MERGED' } }), prisma.repository.count({ where: accessWhere(userId) }), prisma.actionItem.count({ where: { userId, resolvedAt: null, pullRequest: where } }), prisma.pullRequest.count({ where: { ...where, ciStatus: 'FAILING' } }), prisma.userRepositoryAccess.findFirst({ where: { userId, status: 'active' }, orderBy: { lastVerifiedAt: 'desc' } })]); return { openPullRequests, mergedPullRequests, actionItems, failingChecks, repositories, lastSuccessfulSync: last?.lastVerifiedAt?.toISOString() ?? null, coverage: repositories ? 'live' : 'not_connected' }; });
   app.post('/webhooks/github', async (_request, reply) => reply.code(501).send({ error: 'Webhooks are disabled until raw-body signature verification is configured; use reconciliation sync.' }));
-  app.setErrorHandler((error, _request, reply) => { if (error instanceof z.ZodError) return reply.code(400).send({ error: 'Invalid request', details: error.flatten() }); app.log.error(error); return reply.code((error as any).statusCode ?? 500).send({ error: (error as any).statusCode ? error.message : 'Internal server error' }); });
+  app.setErrorHandler((error, _request, reply) => { if (error instanceof z.ZodError) return reply.code(400).send({ error: 'Invalid request', details: error.flatten() }); app.log.error(error); const failure = error as Error & { statusCode?: number }; return reply.code(failure.statusCode ?? 500).send({ error: failure.statusCode ? failure.message : 'Internal server error' }); });
   app.addHook('onClose', async () => prisma.$disconnect());
   return app;
 }

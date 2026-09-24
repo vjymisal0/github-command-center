@@ -11,7 +11,7 @@ let cookieB = '';
 let privateRepoA = '';
 let privatePrA = '';
 
-function cookie(response: { headers: Record<string, string | string[] | undefined> }) {
+function cookie(response: any) {
   const value = response.headers['set-cookie'];
   return (Array.isArray(value) ? value[0] : value ?? '').split(';')[0];
 }
@@ -25,9 +25,10 @@ before(async () => {
   assert.equal(a.statusCode, 201); assert.equal(b.statusCode, 201);
   cookieA = cookie(a); cookieB = cookie(b);
   const userA = await prisma.user.findUniqueOrThrow({ where: { email: `a-${suffix}@example.com` } });
+  const connection = await prisma.gitHubConnection.create({ data: { userId: userA.id, type: 'PAT', status: 'ACTIVE', username: 'account-a' } });
   const repo = await prisma.repository.create({ data: { githubId: BigInt(Date.now()), owner: 'account-a', name: 'account-a/private-project', visibility: 'PRIVATE' } });
   privateRepoA = repo.id;
-  await prisma.userRepositoryAccess.create({ data: { userId: userA.id, repositoryId: repo.id, relationships: ['OWNED'], status: 'active', lastVerifiedAt: new Date() } });
+  await prisma.userRepositoryAccess.create({ data: { userId: userA.id, repositoryId: repo.id, connectionId: connection.id, relationships: ['OWNED'], status: 'active', lastVerifiedAt: new Date() } });
   const pr = await prisma.pullRequest.create({ data: { repositoryId: repo.id, githubNodeId: `node-${suffix}`, number: 1, title: 'A private title', authorLogin: 'account-a', state: 'OPEN', openedAt: new Date(), description: 'A private description' } });
   privatePrA = pr.id;
 });

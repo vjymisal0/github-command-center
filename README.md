@@ -14,13 +14,28 @@ A self-hosted, read-only GitHub command center for repositories, pull requests, 
 
 ## Local development
 
+### Full stack with Docker (recommended)
+
 ```bash
 cp .env.example .env
+# Set CREDENTIAL_ENCRYPTION_KEY to 64 hex characters:
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+docker compose up --build
+```
+
+Open `http://localhost:3100`. The first registered account becomes the initial operator account. Keep `ALLOW_REGISTRATION=false` unless additional account creation is intentionally enabled.
+
+### Run application processes on the host
+
+```bash
 npm install
+npm run db:generate
+docker compose up -d postgres redis
+npm run db:migrate
 npm run dev
 ```
 
-Web runs on `http://localhost:3000`; API runs on `http://localhost:4000`.
+The host-mode web app runs on `http://localhost:3000`; the API runs on `http://localhost:4000`.
 
 ## Production deployment
 
@@ -36,7 +51,9 @@ Put Caddy, Nginx, or another HTTPS reverse proxy in front of web and API. Keep P
 https://your-domain.example/auth/github/callback
 ```
 
-Required production variables include `PUBLIC_WEB_URL`, `PUBLIC_API_URL`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `GITHUB_OAUTH_CALLBACK_URL`, `SESSION_SECRET`, and `CREDENTIAL_ENCRYPTION_KEY`.
+Required production variables include `PUBLIC_WEB_URL`, `PUBLIC_API_URL`, `SESSION_SECRET`, and a randomly generated 64-hex-character `CREDENTIAL_ENCRYPTION_KEY`. Keep registration disabled by default. GitHub OAuth variables are reserved for a future verified OAuth flow; the current secure connection flow uses a fine-grained PAT.
+
+The API applies Prisma migrations before startup. Back up PostgreSQL before upgrades. A lost credential-encryption key cannot be recovered; rotate it only with a deliberate credential reconnection or re-encryption procedure.
 
 ## Scope
 

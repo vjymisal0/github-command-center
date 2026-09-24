@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { encryptCredential, decryptCredential } from './crypto.js';
 
+process.env.CREDENTIAL_ENCRYPTION_KEY = 'a'.repeat(64);
+
 test('encrypts and decrypts a GitHub credential with AES-256-GCM', () => {
   const secret = 'ghp_exampleTokenSecret1234567890abcdef';
   const encrypted = encryptCredential(secret);

@@ -43,6 +43,7 @@ services:
       GITHUB_WEBHOOK_SECRET: ${GITHUB_WEBHOOK_SECRET:-}
       CREDENTIAL_ENCRYPTION_KEY: ${CREDENTIAL_ENCRYPTION_KEY:?set CREDENTIAL_ENCRYPTION_KEY to 64 hex characters}
       ALLOW_REGISTRATION: ${ALLOW_REGISTRATION:-false}
+    command: ["sh", "-c", "npm run db:migrate && npm run start -w apps/api"]
     depends_on:
       postgres:
         condition: service_healthy

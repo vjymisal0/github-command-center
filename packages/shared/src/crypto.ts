@@ -1,17 +1,11 @@
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 
-// 32-byte key required for AES-256-GCM
-const DEFAULT_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
-
 export function getEncryptionKey(): Buffer {
-  const hex = process.env.CREDENTIAL_ENCRYPTION_KEY ?? DEFAULT_KEY;
-  if (hex.length === 64) {
-    return Buffer.from(hex, 'hex');
+  const hex = process.env.CREDENTIAL_ENCRYPTION_KEY;
+  if (!hex || !/^[a-f0-9]{64}$/i.test(hex)) {
+    throw new Error('CREDENTIAL_ENCRYPTION_KEY must be exactly 64 hexadecimal characters');
   }
-  // Fallback: pad or slice to 32 bytes
-  const buf = Buffer.alloc(32);
-  buf.write(hex, 'utf-8');
-  return buf;
+  return Buffer.from(hex, 'hex');
 }
 
 export interface EncryptedPayload {

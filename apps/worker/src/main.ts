@@ -46,9 +46,10 @@ export async function syncUserRepositoriesAndPRs(userId: string, connectionId: s
 
       await prisma.userRepositoryAccess.upsert({
         where: {
-          userId_repositoryId: {
+          userId_repositoryId_connectionId: {
             userId,
             repositoryId: dbRepo.id,
+            connectionId,
           },
         },
         update: {
