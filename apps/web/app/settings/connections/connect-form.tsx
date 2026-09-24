@@ -47,7 +47,7 @@ export function ConnectPatForm() {
   return (
     <form className="panel login" onSubmit={handleSubmit}>
       <h2>Connect GitHub PAT</h2>
-      <p>Enter a fine-grained or classic PAT from your GitHub account. You can submit multiple tokens to connect both of your GitHub accounts.</p>
+      <p>Paste a read-only GitHub token.</p>
 
       {success && (
         <div style={{ padding: '0.65rem', border: '1px solid #16a34a', color: '#16a34a', borderRadius: '0.5rem' }}>
@@ -67,7 +67,7 @@ export function ConnectPatForm() {
       </label>
 
       <button className="button" type="submit" disabled={loading}>
-        {loading ? 'Validating & Ingesting...' : 'Connect & Sync Account'}
+        {loading ? 'Connecting…' : 'Connect GitHub'}
       </button>
     </form>
   );

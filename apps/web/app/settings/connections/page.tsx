@@ -18,7 +18,7 @@ export default async function ConnectionsPage({
     <section className="access-page">
       <div className="access-hero">
         <PageHeader eyebrow="Settings" title="GitHub access">
-          <p>{hasAccounts ? 'GitHub is connected. Synced repositories and pull requests are live.' : 'No GitHub account is connected. Choose GitHub sign-in or paste a read-only token to start syncing.'}</p>
+          <p>{hasAccounts ? 'Sync active.' : 'Connect a read-only token.'}</p>
         </PageHeader>
         <div className={hasAccounts ? 'connection-pill connected' : 'connection-pill'}>
           <span /> {hasAccounts ? `${accounts.length} connected` : 'Not connected'}
@@ -33,10 +33,10 @@ export default async function ConnectionsPage({
       {!hasAccounts && (
         <div className="connect-grid">
           <div className="connect-card primary">
-            <span>Recommended connection</span>
-            <strong>Fine-grained Personal Access Token</strong>
-            <p>Choose only the repositories you want tracked and grant read-only permissions, then enter the token below.</p>
-            <em>Your token is encrypted at rest.</em>
+            <span>Recommended</span>
+            <strong>Fine-grained token</strong>
+            <p>Select repositories and read-only access.</p>
+            <em>Encrypted at rest.</em>
           </div>
         </div>
       )}
@@ -45,7 +45,7 @@ export default async function ConnectionsPage({
 
       <details className="panel permissions-panel">
         <summary>Token permission checklist</summary>
-        <p>For PATs, use read-only access where GitHub lets you choose it.</p>
+        <p>Use read-only permissions.</p>
         <ul>{connections.permissionChecklist.map((item: string) => <li key={item}>{item}</li>)}</ul>
       </details>
     </section>

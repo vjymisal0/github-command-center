@@ -36,6 +36,7 @@ before(async () => {
     { userId: userA.id, repositoryId: repo.id, connectionId: backupConnection.id, relationships: ['OWNED'], status: 'active', lastVerifiedAt: new Date() },
   ] });
   const pr = await prisma.pullRequest.create({ data: { repositoryId: repo.id, githubNodeId: `node-${suffix}`, number: 1, title: 'A private title', authorLogin: 'account-a', state: 'OPEN', openedAt: new Date(), description: 'A private description' } });
+  await prisma.pullRequest.create({ data: { repositoryId: repo.id, githubNodeId: `other-node-${suffix}`, number: 2, title: 'Another author PR', authorLogin: 'someone-else', state: 'MERGED', openedAt: new Date(), mergedAt: new Date() } });
   privatePrA = pr.id;
 });
 
@@ -54,6 +55,13 @@ test('user A sees their entitled private data', async () => {
   const repos = await app.inject({ method: 'GET', url: '/repositories', headers: { cookie: cookieA } });
   assert.equal(repos.statusCode, 200);
   assert.equal(repos.json().data.some((r: { id: string }) => r.id === privateRepoA), true);
+});
+
+test('overview counts only pull requests authored by the connected GitHub user', async () => {
+  const response = await app.inject({ method: 'GET', url: '/analytics/overview', headers: { cookie: cookieA } });
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.json().openPullRequests, 1);
+  assert.equal(response.json().mergedPullRequests, 0);
 });
 
 test('user B cannot list or directly access user A data', async () => {

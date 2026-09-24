@@ -51,8 +51,9 @@ async function requireEncryptionKey() {
 async function syncGitHubData(userId: string, connectionId: string, token: string, log: FastifyRequest['log']) {
   const octokit = new Octokit({ auth: token });
   const { data: ghUser } = await octokit.rest.users.getAuthenticated();
-  const { data: repos } = await octokit.rest.repos.listForAuthenticatedUser({ per_page: 100, affiliation: 'owner,collaborator,organization_member', sort: 'updated' });
+  const repos = await octokit.paginate(octokit.rest.repos.listForAuthenticatedUser, { per_page: 100, affiliation: 'owner,collaborator,organization_member', sort: 'updated' });
   const seenRepositoryIds: string[] = [];
+  const seenPullRequestIds: string[] = [];
   let pullRequests = 0;
 
   for (const repo of repos) {
@@ -68,21 +69,53 @@ async function syncGitHubData(userId: string, connectionId: string, token: strin
       update: { connectionId, relationships: [relationship], status: 'active', lastVerifiedAt: new Date() },
       create: { userId, repositoryId: record.id, connectionId, relationships: [relationship], status: 'active', lastVerifiedAt: new Date() },
     });
-    const { data: prs } = await octokit.rest.pulls.list({ owner: repo.owner.login, repo: repo.name, state: 'all', per_page: 100, sort: 'updated', direction: 'desc' });
-    for (const pr of prs) {
-      const state: PullRequestState = pr.merged_at ? 'MERGED' : pr.state === 'open' ? 'OPEN' : 'CLOSED';
-      const dbPr = await prisma.pullRequest.upsert({
-        where: { repositoryId_number: { repositoryId: record.id, number: pr.number } },
-        update: { title: pr.title, authorLogin: pr.user?.login ?? 'unknown', state, draft: pr.draft ?? false, mergedAt: pr.merged_at ? new Date(pr.merged_at) : null, closedAt: pr.closed_at ? new Date(pr.closed_at) : null, htmlUrl: pr.html_url, description: pr.body, lastSyncedAt: new Date() },
-        create: { repositoryId: record.id, githubNodeId: pr.node_id, number: pr.number, title: pr.title, authorLogin: pr.user?.login ?? 'unknown', state, draft: pr.draft ?? false, openedAt: new Date(pr.created_at), mergedAt: pr.merged_at ? new Date(pr.merged_at) : null, closedAt: pr.closed_at ? new Date(pr.closed_at) : null, htmlUrl: pr.html_url, description: pr.body },
-      });
-      const facts: PullRequestFacts = { authorLogin: pr.user?.login ?? '', currentUserLogin: ghUser.login, draft: pr.draft ?? false, state, reviewRequested: (pr.requested_reviewers ?? []).some(r => 'login' in r && r.login?.toLowerCase() === ghUser.login.toLowerCase()) };
-      const activeReasons = classifyActionReasons(facts);
-      await prisma.actionItem.updateMany({ where: { userId, pullRequestId: dbPr.id, reason: { notIn: activeReasons }, resolvedAt: null }, data: { resolvedAt: new Date() } });
-      for (const reason of activeReasons) await prisma.actionItem.upsert({ where: { userId_pullRequestId_reason: { userId, pullRequestId: dbPr.id, reason } }, update: { lastSeenAt: new Date(), resolvedAt: null }, create: { userId, pullRequestId: dbPr.id, reason, evidence: { source: 'github-sync' } } });
-      pullRequests++;
-    }
   }
+
+  const searches = await Promise.all([
+    octokit.paginate(octokit.rest.search.issuesAndPullRequests, { q: `type:pr author:${ghUser.login} state:open`, per_page: 100 }),
+    octokit.paginate(octokit.rest.search.issuesAndPullRequests, { q: `type:pr author:${ghUser.login} is:merged`, per_page: 100 }),
+    octokit.paginate(octokit.rest.search.issuesAndPullRequests, { q: `type:pr review-requested:${ghUser.login} state:open`, per_page: 100 }),
+  ]);
+  const authoredOrReviewRequested = new Map(searches.flat().map(item => [item.id, item]));
+  const reviewRequestedIds = new Set(searches[2].map(item => item.id));
+
+  for (const item of authoredOrReviewRequested.values()) {
+    const [owner, repoName] = item.repository_url.replace('https://api.github.com/repos/', '').split('/');
+    let record = await prisma.repository.findUnique({ where: { owner_name: { owner, name: `${owner}/${repoName}` } } });
+    if (!record) {
+      const { data: repo } = await octokit.rest.repos.get({ owner, repo: repoName });
+      record = await prisma.repository.upsert({
+        where: { githubId: BigInt(repo.id) },
+        update: { owner, name: repo.full_name, visibility: (repo.private ? 'PRIVATE' : 'PUBLIC') as RepositoryVisibility },
+        create: { githubId: BigInt(repo.id), owner, name: repo.full_name, visibility: (repo.private ? 'PRIVATE' : 'PUBLIC') as RepositoryVisibility },
+      });
+    }
+    const alreadyAccessible = seenRepositoryIds.includes(record.id);
+    if (!alreadyAccessible) {
+      seenRepositoryIds.push(record.id);
+      await prisma.userRepositoryAccess.upsert({
+        where: { userId_repositoryId_connectionId: { userId, repositoryId: record.id, connectionId } },
+        update: { relationships: ['EXTERNAL_CONTRIBUTION'], status: 'active', lastVerifiedAt: new Date() },
+        create: { userId, repositoryId: record.id, connectionId, relationships: ['EXTERNAL_CONTRIBUTION'], status: 'active', lastVerifiedAt: new Date() },
+      });
+    }
+    const mergedAt = item.pull_request?.merged_at ?? null;
+    const state: PullRequestState = mergedAt ? 'MERGED' : item.state === 'open' ? 'OPEN' : 'CLOSED';
+    const draft = Boolean(item.draft);
+    const dbPr = await prisma.pullRequest.upsert({
+      where: { repositoryId_number: { repositoryId: record.id, number: item.number } },
+      update: { title: item.title, authorLogin: item.user?.login ?? 'unknown', state, draft, mergedAt: mergedAt ? new Date(mergedAt) : null, closedAt: item.closed_at ? new Date(item.closed_at) : null, htmlUrl: item.html_url, description: item.body, lastSyncedAt: new Date() },
+      create: { repositoryId: record.id, githubNodeId: item.node_id, number: item.number, title: item.title, authorLogin: item.user?.login ?? 'unknown', state, draft, openedAt: new Date(item.created_at), mergedAt: mergedAt ? new Date(mergedAt) : null, closedAt: item.closed_at ? new Date(item.closed_at) : null, htmlUrl: item.html_url, description: item.body },
+    });
+    seenPullRequestIds.push(dbPr.id);
+    const facts: PullRequestFacts = { authorLogin: item.user?.login ?? '', currentUserLogin: ghUser.login, draft, state, reviewRequested: reviewRequestedIds.has(item.id) };
+    const activeReasons = classifyActionReasons(facts);
+    await prisma.actionItem.updateMany({ where: { userId, pullRequestId: dbPr.id, reason: { notIn: activeReasons }, resolvedAt: null }, data: { resolvedAt: new Date() } });
+    for (const reason of activeReasons) await prisma.actionItem.upsert({ where: { userId_pullRequestId_reason: { userId, pullRequestId: dbPr.id, reason } }, update: { lastSeenAt: new Date(), resolvedAt: null }, create: { userId, pullRequestId: dbPr.id, reason, evidence: { source: 'github-sync' } } });
+    pullRequests++;
+  }
+
+  await prisma.actionItem.updateMany({ where: { userId, resolvedAt: null, pullRequestId: { notIn: seenPullRequestIds } }, data: { resolvedAt: new Date() } });
   await prisma.userRepositoryAccess.updateMany({ where: { userId, connectionId, repositoryId: { notIn: seenRepositoryIds } }, data: { status: 'revoked', lastVerifiedAt: new Date() } });
   await prisma.gitHubConnection.update({ where: { id: connectionId }, data: { githubUserId: BigInt(ghUser.id), username: ghUser.login, status: 'ACTIVE' } });
   log.info({ userId, connectionId, repositories: repos.length, pullRequests }, 'GitHub sync completed');
@@ -183,16 +216,67 @@ export async function buildApp(opts: { logger?: boolean } = {}) {
   app.get('/sync/status', async request => { const count = await prisma.gitHubConnection.count({ where: { userId: request.authUser!.id, status: 'ACTIVE' } }); const last = await prisma.userRepositoryAccess.findFirst({ where: { userId: request.authUser!.id, status: 'active' }, orderBy: { lastVerifiedAt: 'desc' }, select: { lastVerifiedAt: true } }); return { state: count ? 'synced' : 'not_configured', message: count ? `${count} GitHub account(s) active.` : 'Connect GitHub before first sync.', lastSuccessfulSync: last?.lastVerifiedAt?.toISOString() ?? null }; });
 
   const accessWhere = (userId: string) => ({ userAccess: { some: { userId, status: 'active' } } });
-  app.get('/repositories', async request => { const q = listQuery.parse(request.query); const records = await prisma.repository.findMany({ where: { ...accessWhere(request.authUser!.id), ...(q.search ? { name: { contains: q.search, mode: 'insensitive' as const } } : {}), ...(q.visibility ? { visibility: q.visibility.toUpperCase() as RepositoryVisibility } : {}) }, include: { userAccess: { where: { userId: request.authUser!.id, status: 'active' } }, _count: { select: { pullRequests: true } } }, orderBy: { updatedAt: 'desc' } }); const data = records.map(r => ({ id: r.id, name: r.name, relationship: relationLabel(r.userAccess[0]?.relationships ?? []), visibility: r.visibility[0] + r.visibility.slice(1).toLowerCase(), prs: r._count.pullRequests, synced: r.userAccess[0]?.lastVerifiedAt?.toISOString() ?? 'pending' })).filter(r => !q.relationship || r.relationship.toLowerCase() === q.relationship.toLowerCase()); return { total: data.length, data, coverage: data.length ? 'live' : 'not_connected' }; });
-  app.get('/repositories/:id', async request => { const { id } = request.params as { id: string }; const r = await prisma.repository.findFirst({ where: { id, ...accessWhere(request.authUser!.id) }, include: { userAccess: { where: { userId: request.authUser!.id, status: 'active' } }, _count: { select: { pullRequests: true } } } }); if (!r) return app.httpErrors.notFound('Repository not found'); return { id: r.id, name: r.name, relationship: relationLabel(r.userAccess[0].relationships), visibility: r.visibility, prs: r._count.pullRequests, synced: r.userAccess[0].lastVerifiedAt?.toISOString() ?? 'pending' }; });
+  const connectedUsernames = async (userId: string) => (await prisma.gitHubConnection.findMany({ where: { userId, status: 'ACTIVE', username: { not: null } }, select: { username: true } })).flatMap(connection => connection.username ? [connection.username] : []);
+  app.get('/repositories', async request => {
+    const userId = request.authUser!.id;
+    const q = listQuery.parse(request.query);
+    const usernames = await connectedUsernames(userId);
+    const records = await prisma.repository.findMany({
+      where: { ...accessWhere(userId), ...(q.search ? { name: { contains: q.search, mode: 'insensitive' as const } } : {}), ...(q.visibility ? { visibility: q.visibility.toUpperCase() as RepositoryVisibility } : {}) },
+      include: { userAccess: { where: { userId, status: 'active' } }, _count: { select: { pullRequests: { where: { authorLogin: { in: usernames } } } } } },
+      orderBy: { updatedAt: 'desc' },
+    });
+    const data = records.map(r => ({ id: r.id, name: r.name, relationship: relationLabel(r.userAccess[0]?.relationships ?? []), visibility: r.visibility[0] + r.visibility.slice(1).toLowerCase(), prs: r._count.pullRequests, synced: r.userAccess[0]?.lastVerifiedAt?.toISOString() ?? 'pending' })).filter(r => !q.relationship || r.relationship.toLowerCase() === q.relationship.toLowerCase());
+    return { total: data.length, data, coverage: data.length ? 'live' : 'not_connected' };
+  });
+  app.get('/repositories/:id', async request => {
+    const userId = request.authUser!.id;
+    const { id } = request.params as { id: string };
+    const usernames = await connectedUsernames(userId);
+    const r = await prisma.repository.findFirst({ where: { id, ...accessWhere(userId) }, include: { userAccess: { where: { userId, status: 'active' } }, _count: { select: { pullRequests: { where: { authorLogin: { in: usernames } } } } } } });
+    if (!r) return app.httpErrors.notFound('Repository not found');
+    return { id: r.id, name: r.name, relationship: relationLabel(r.userAccess[0].relationships), visibility: r.visibility, prs: r._count.pullRequests, synced: r.userAccess[0].lastVerifiedAt?.toISOString() ?? 'pending' };
+  });
 
   const prShape = (p: any) => ({ id: p.id, repo: p.repository.name, number: p.number, title: p.title, author: p.authorLogin, state: p.draft ? 'Draft' : p.state[0] + p.state.slice(1).toLowerCase(), ci: p.ciStatus, review: p.reviewStatus, reasons: p.actionItems?.map((a: any) => a.reason) ?? [], updated: p.lastSyncedAt.toISOString(), htmlUrl: p.htmlUrl });
   const scopedPrWhere = (userId: string) => ({ repository: accessWhere(userId) });
-  app.get('/pull-requests', async request => { const q = listQuery.parse(request.query); const records = await prisma.pullRequest.findMany({ where: { ...scopedPrWhere(request.authUser!.id), ...(q.search ? { OR: [{ title: { contains: q.search, mode: 'insensitive' as const } }, { repository: { name: { contains: q.search, mode: 'insensitive' as const }, ...accessWhere(request.authUser!.id) } }] } : {}), ...(q.state ? { state: q.state.toUpperCase() as PullRequestState } : {}), ...(q.ci ? { ciStatus: q.ci.toUpperCase() } : {}) }, include: { repository: true, actionItems: { where: { userId: request.authUser!.id, resolvedAt: null } } }, orderBy: { lastSyncedAt: 'desc' } }); return { total: records.length, data: records.map(prShape), coverage: records.length ? 'live' : 'not_connected' }; });
+  app.get('/pull-requests', async request => {
+    const userId = request.authUser!.id;
+    const q = listQuery.parse(request.query);
+    const usernames = await connectedUsernames(userId);
+    const records = await prisma.pullRequest.findMany({
+      where: {
+        AND: [
+          scopedPrWhere(userId),
+          { OR: [{ authorLogin: { in: usernames } }, { actionItems: { some: { userId, resolvedAt: null } } }] },
+          ...(q.search ? [{ OR: [{ title: { contains: q.search, mode: 'insensitive' as const } }, { repository: { name: { contains: q.search, mode: 'insensitive' as const } } }] }] : []),
+        ],
+        ...(q.state ? { state: q.state.toUpperCase() as PullRequestState } : {}),
+        ...(q.ci ? { ciStatus: q.ci.toUpperCase() } : {}),
+      },
+      include: { repository: true, actionItems: { where: { userId, resolvedAt: null } } },
+      orderBy: { lastSyncedAt: 'desc' },
+    });
+    return { total: records.length, data: records.map(prShape), coverage: records.length ? 'live' : 'not_connected' };
+  });
   app.get('/pull-requests/:id', async request => { const { id } = request.params as { id: string }; const p = await prisma.pullRequest.findFirst({ where: { id, ...scopedPrWhere(request.authUser!.id) }, include: { repository: true, actionItems: { where: { userId: request.authUser!.id, resolvedAt: null } } } }); if (!p) return app.httpErrors.notFound('Pull request not found'); return { ...prShape(p), hasDescription: Boolean(p.description) }; });
   app.get('/pull-requests/:id/description', async request => { const { id } = request.params as { id: string }; const p = await prisma.pullRequest.findFirst({ where: { id, ...scopedPrWhere(request.authUser!.id) }, select: { id: true, description: true } }); if (!p) return app.httpErrors.notFound('Pull request not found'); return { id: p.id, description: p.description || 'No description provided.' }; });
   app.get('/inbox', async request => { const records = await prisma.actionItem.findMany({ where: { userId: request.authUser!.id, resolvedAt: null, pullRequest: scopedPrWhere(request.authUser!.id) }, include: { pullRequest: { include: { repository: true, actionItems: { where: { userId: request.authUser!.id, resolvedAt: null } } } } }, orderBy: { lastSeenAt: 'desc' } }); return { total: records.length, data: records.map(a => ({ id: a.id, reason: a.reason, pullRequest: prShape(a.pullRequest) })), coverage: records.length ? 'live' : 'not_connected' }; });
-  app.get('/analytics/overview', async request => { const userId = request.authUser!.id; const where = scopedPrWhere(userId); const [openPullRequests, mergedPullRequests, repositories, actionItems, failingChecks, last] = await Promise.all([prisma.pullRequest.count({ where: { ...where, state: 'OPEN' } }), prisma.pullRequest.count({ where: { ...where, state: 'MERGED' } }), prisma.repository.count({ where: accessWhere(userId) }), prisma.actionItem.count({ where: { userId, resolvedAt: null, pullRequest: where } }), prisma.pullRequest.count({ where: { ...where, ciStatus: 'FAILING' } }), prisma.userRepositoryAccess.findFirst({ where: { userId, status: 'active' }, orderBy: { lastVerifiedAt: 'desc' } })]); return { openPullRequests, mergedPullRequests, actionItems, failingChecks, repositories, lastSuccessfulSync: last?.lastVerifiedAt?.toISOString() ?? null, coverage: repositories ? 'live' : 'not_connected' }; });
+  app.get('/analytics/overview', async request => {
+    const userId = request.authUser!.id;
+    const where = scopedPrWhere(userId);
+    const usernames = await connectedUsernames(userId);
+    const authored = { ...where, authorLogin: { in: usernames } };
+    const [openPullRequests, mergedPullRequests, repositories, actionItems, failingChecks, last] = await Promise.all([
+      prisma.pullRequest.count({ where: { ...authored, state: 'OPEN' } }),
+      prisma.pullRequest.count({ where: { ...authored, state: 'MERGED' } }),
+      prisma.repository.count({ where: accessWhere(userId) }),
+      prisma.actionItem.count({ where: { userId, resolvedAt: null, pullRequest: where } }),
+      prisma.pullRequest.count({ where: { ...where, ciStatus: 'FAILING' } }),
+      prisma.userRepositoryAccess.findFirst({ where: { userId, status: 'active' }, orderBy: { lastVerifiedAt: 'desc' } }),
+    ]);
+    return { openPullRequests, mergedPullRequests, actionItems, failingChecks, repositories, lastSuccessfulSync: last?.lastVerifiedAt?.toISOString() ?? null, coverage: repositories ? 'live' : 'not_connected' };
+  });
   app.post('/webhooks/github', async (_request, reply) => reply.code(501).send({ error: 'Webhooks are disabled until raw-body signature verification is configured; use reconciliation sync.' }));
   app.setErrorHandler((error, _request, reply) => { if (error instanceof z.ZodError) return reply.code(400).send({ error: 'Invalid request', details: error.flatten() }); app.log.error(error); const failure = error as Error & { statusCode?: number }; return reply.code(failure.statusCode ?? 500).send({ error: failure.statusCode ? failure.message : 'Internal server error' }); });
   app.addHook('onClose', async () => prisma.$disconnect());
