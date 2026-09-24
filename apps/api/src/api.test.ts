@@ -51,6 +51,22 @@ test('anonymous data requests are rejected', async () => {
   assert.equal(response.statusCode, 401);
 });
 
+test('GitHub login requests only profile and verified-email scopes', async () => {
+  const previous = process.env.GITHUB_CLIENT_ID;
+  process.env.GITHUB_CLIENT_ID = 'test-client';
+  try {
+    const response = await app.inject({ method: 'GET', url: '/auth/github' });
+    assert.equal(response.statusCode, 302);
+    const location = new URL(response.headers.location!);
+    assert.equal(location.searchParams.get('scope'), 'read:user user:email');
+    assert.equal(location.searchParams.get('scope')?.includes('repo'), false);
+    assert.ok(response.headers['set-cookie']);
+  } finally {
+    if (previous === undefined) delete process.env.GITHUB_CLIENT_ID;
+    else process.env.GITHUB_CLIENT_ID = previous;
+  }
+});
+
 test('user A sees their entitled private data', async () => {
   const repos = await app.inject({ method: 'GET', url: '/repositories', headers: { cookie: cookieA } });
   assert.equal(repos.statusCode, 200);
