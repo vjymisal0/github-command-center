@@ -41,7 +41,7 @@ export default async function ConnectionsPage({
         </div>
       )}
 
-      <ConnectPatForm />
+      {!hasAccounts && <ConnectPatForm />}
 
       <details className="panel permissions-panel">
         <summary>Token permission checklist</summary>

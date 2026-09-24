@@ -19,7 +19,7 @@ const prisma = new PrismaClient();
 const webUrl = process.env.PUBLIC_WEB_URL ?? 'http://localhost:3000';
 const production = process.env.NODE_ENV === 'production';
 const listQuery = z.object({ search: z.string().max(200).optional(), state: z.string().optional(), ci: z.string().optional(), visibility: z.string().optional(), relationship: z.string().optional() });
-const credentialsBody = z.object({ email: z.string().email(), password: z.string().min(12).max(200) });
+const credentialsBody = z.object({ email: z.string().email(), password: z.string().min(8).max(200) });
 const patBody = z.object({ token: z.string().min(20).max(500) });
 
 type AuthUser = { id: string; email: string; name: string | null };
@@ -30,7 +30,8 @@ function hashPassword(password: string) {
   const salt = randomBytes(16);
   return `${salt.toString('hex')}:${scryptSync(password, salt, 32).toString('hex')}`;
 }
-function verifyPassword(password: string, stored: string) {
+function verifyPassword(password: string, stored: string | null) {
+  if (!stored) return false;
   const [saltHex, hashHex] = stored.split(':');
   if (!saltHex || !hashHex) return false;
   const actual = scryptSync(password, Buffer.from(saltHex, 'hex'), 32);
@@ -151,11 +152,55 @@ export async function buildApp(opts: { logger?: boolean } = {}) {
       else if (session) await prisma.session.delete({ where: { id: sid } });
     }
     const path = request.url.split('?')[0];
-    if (path === '/health' || path === '/auth/register' || path === '/auth/login' || path === '/auth/me') return;
+    if (path === '/health' || path === '/auth/register' || path === '/auth/login' || path === '/auth/me' || path === '/auth/github' || path === '/auth/github/callback') return;
     if (!request.authUser) return reply.code(401).send({ error: 'Authentication required' });
   });
 
   app.get('/health', async () => { await prisma.$queryRaw`SELECT 1`; return { ok: true }; });
+  app.get('/auth/github', async (_request, reply) => {
+    const clientId = process.env.GITHUB_CLIENT_ID;
+    if (!clientId) return reply.code(503).send({ error: 'GitHub login is not configured' });
+    const state = randomBytes(24).toString('hex');
+    reply.setCookie('oauth_state', state, { httpOnly: true, sameSite: 'lax', secure: production, path: '/', maxAge: 600 });
+    const callback = process.env.GITHUB_OAUTH_CALLBACK_URL ?? `${webUrl}/api/auth/github/callback`;
+    const params = new URLSearchParams({ client_id: clientId, redirect_uri: callback, scope: 'read:user user:email repo', state });
+    return reply.redirect(`https://github.com/login/oauth/authorize?${params}`);
+  });
+  app.get('/auth/github/callback', async (request, reply) => {
+    const query = z.object({ code: z.string().min(1), state: z.string().min(1) }).parse(request.query);
+    if (!request.cookies.oauth_state || query.state !== request.cookies.oauth_state) return reply.code(400).send({ error: 'Invalid or expired OAuth state' });
+    reply.clearCookie('oauth_state', { path: '/' });
+    const clientId = process.env.GITHUB_CLIENT_ID;
+    const clientSecret = process.env.GITHUB_CLIENT_SECRET;
+    if (!clientId || !clientSecret) return reply.code(503).send({ error: 'GitHub login is not configured' });
+    const tokenResponse = await fetch('https://github.com/login/oauth/access_token', { method: 'POST', headers: { accept: 'application/json', 'content-type': 'application/json' }, body: JSON.stringify({ client_id: clientId, client_secret: clientSecret, code: query.code }) });
+    const tokenBody = await tokenResponse.json() as { access_token?: string; error_description?: string };
+    if (!tokenBody.access_token) return reply.code(401).send({ error: tokenBody.error_description ?? 'GitHub authorization failed' });
+    const octokit = new Octokit({ auth: tokenBody.access_token });
+    const { data: github } = await octokit.rest.users.getAuthenticated();
+    let email = github.email;
+    if (!email) {
+      const { data: emails } = await octokit.rest.users.listEmailsForAuthenticatedUser();
+      email = emails.find(item => item.primary && item.verified)?.email ?? emails.find(item => item.verified)?.email ?? null;
+    }
+    if (!email) return reply.code(400).send({ error: 'A verified GitHub email is required' });
+    const normalizedEmail = email.toLowerCase();
+    let user = await prisma.user.findFirst({ where: { OR: [{ githubUserId: BigInt(github.id) }, { email: normalizedEmail }] } });
+    user = user
+      ? await prisma.user.update({ where: { id: user.id }, data: { githubUserId: BigInt(github.id), githubLogin: github.login, name: user.name ?? github.name ?? github.login } })
+      : await prisma.user.create({ data: { email: normalizedEmail, name: github.name ?? github.login, githubUserId: BigInt(github.id), githubLogin: github.login } });
+    const connectionId = `oauth_${user.id}_${github.id}`;
+    const encrypted = encryptCredential(tokenBody.access_token);
+    await prisma.$transaction(async tx => {
+      await tx.gitHubConnection.upsert({ where: { id: connectionId }, update: { status: 'ACTIVE', username: github.login, githubUserId: BigInt(github.id) }, create: { id: connectionId, userId: user.id, type: 'PAT', status: 'ACTIVE', username: github.login, githubUserId: BigInt(github.id), scopes: ['repo', 'read:user', 'user:email'] } });
+      await tx.encryptedCredential.upsert({ where: { connectionId }, update: { keyVersion: encrypted.keyVersion, ciphertext: new Uint8Array(encrypted.ciphertext), nonce: new Uint8Array(encrypted.nonce), tag: new Uint8Array(encrypted.tag) }, create: { connectionId, keyVersion: encrypted.keyVersion, ciphertext: new Uint8Array(encrypted.ciphertext), nonce: new Uint8Array(encrypted.nonce), tag: new Uint8Array(encrypted.tag) } });
+    });
+    const sid = randomUUID();
+    await prisma.session.create({ data: { id: sid, userId: user.id, expiresAt: new Date(Date.now() + 30 * 86400000) } });
+    sessionCookie(reply, sid);
+    void syncGitHubData(user.id, connectionId, tokenBody.access_token, request.log).catch(error => request.log.error({ error, userId: user.id, connectionId }, 'GitHub OAuth sync failed'));
+    return reply.redirect(webUrl);
+  });
   app.post('/auth/register', async (request, reply) => {
     const body = credentialsBody.parse(request.body);
     const allowRegistration = process.env.ALLOW_REGISTRATION === 'true' || (await prisma.user.count()) === 0;
@@ -187,11 +232,12 @@ export async function buildApp(opts: { logger?: boolean } = {}) {
   });
   app.post('/connections/pat/test', async request => { const { token } = patBody.parse(request.body); const { data: user } = await new Octokit({ auth: token }).rest.users.getAuthenticated(); return { ok: true, githubUser: { id: user.id, login: user.login, avatarUrl: user.avatar_url } }; });
   app.post('/connections/pat', async (request, reply) => {
+    const userId = request.authUser!.id;
+    if (await prisma.gitHubConnection.count({ where: { userId, status: 'ACTIVE' } })) return reply.code(409).send({ error: 'A GitHub account is already connected' });
     const { token } = patBody.parse(request.body);
     const octokit = new Octokit({ auth: token });
     let ghUser;
     try { ghUser = (await octokit.rest.users.getAuthenticated()).data; } catch { return reply.code(401).send({ error: 'GitHub token validation failed' }); }
-    const userId = request.authUser!.id;
     const id = `pat_${userId}_${ghUser.id}`;
     const encrypted = encryptCredential(token);
     await prisma.$transaction(async tx => {
@@ -281,7 +327,7 @@ export async function buildApp(opts: { logger?: boolean } = {}) {
     const [openPullRequests, mergedPullRequests, repositories, actionItems, failingChecks, last] = await Promise.all([
       prisma.pullRequest.count({ where: { ...authored, state: 'OPEN' } }),
       prisma.pullRequest.count({ where: { ...authored, state: 'MERGED' } }),
-      prisma.repository.count({ where: accessWhere(userId) }),
+      prisma.repository.count({ where: { userAccess: { some: { userId, status: 'active', relationships: { hasSome: ['OWNED', 'COLLABORATING'] } } } } }),
       prisma.actionItem.count({ where: { userId, resolvedAt: null, pullRequest: where } }),
       prisma.pullRequest.count({ where: { ...where, ciStatus: 'FAILING' } }),
       prisma.userRepositoryAccess.findFirst({ where: { userId, status: 'active' }, orderBy: { lastVerifiedAt: 'desc' } }),
