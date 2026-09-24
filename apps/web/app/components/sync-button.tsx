@@ -4,7 +4,7 @@ import { useState } from 'react';
 
 export function SyncButton({ initialLastSync, connected }: { initialLastSync: string | null; connected: boolean }) {
   const [loading, setLoading] = useState(false);
-  const [lastSync, setLastSync] = useState<string | null>(initialLastSync);
+  const lastSync = initialLastSync;
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
 
   async function handleSync() {
@@ -18,9 +18,8 @@ export function SyncButton({ initialLastSync, connected }: { initialLastSync: st
     try {
       const syncRes = await fetch('/api/sync', { method: 'POST' });
       if (!syncRes.ok) throw new Error('Sync failed');
-      setLastSync(new Date().toISOString());
-      setStatusMsg('Synchronized');
-      setTimeout(() => window.location.reload(), 500);
+      setStatusMsg('Sync started');
+      setTimeout(() => window.location.reload(), 5000);
     } catch {
       setStatusMsg('Sync failed');
       setLoading(false);

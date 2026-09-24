@@ -18,8 +18,8 @@ export default async function OverviewPage() {
       <div className="overview-hero">
         <div>
           <p className="eyebrow">Overview</p>
-          <h1>Command center for your GitHub work.</h1>
-          <p>Connect GitHub to track pull requests, reviews, checks, and repositories without the noise.</p>
+          <h1>Your GitHub work.</h1>
+          <p>Pull requests, reviews, and repositories.</p>
           {!connected && <a className="button hero-cta" href="/settings/connections">Connect GitHub</a>}
         </div>
         <div className="hero-orb" aria-hidden="true">
@@ -32,25 +32,10 @@ export default async function OverviewPage() {
 
       {!connected && (
         <div className="notice warning connect-warning">
-          <strong>GitHub is not connected.</strong>
-          <span>Connect an account to enable sync and live data.</span>
-          <a href="/settings/connections">Connect now</a>
+          <strong>Connect GitHub to begin.</strong>
+          <a href="/settings/connections">Connect</a>
         </div>
       )}
-
-      <div className="overview-info-grid" aria-label="About OSS Tracker">
-        <article className="card overview-info-card">
-          <p className="eyebrow">What it does</p>
-          <h2>One calm view of your open-source work.</h2>
-          <p>OSS Tracker brings together your pull requests, reviews, checks, and repositories so you can quickly see what needs attention.</p>
-        </article>
-        <article className="card overview-info-card">
-          <p className="eyebrow">Your GitHub access</p>
-          <h2>Designed for read-only visibility.</h2>
-          <p>Use a fine-grained, read-only token with selected repositories. OSS Tracker only reads and syncs GitHub data—it does not push code, merge PRs, comment, or change your repositories. Tokens are encrypted when stored in the database, and you can revoke access from GitHub at any time.</p>
-          <a href="/settings/connections">Review GitHub access →</a>
-        </article>
-      </div>
 
       <div className="metrics-simple">
         {cards.map(([label, value, href, icon]) => (
@@ -66,7 +51,7 @@ export default async function OverviewPage() {
         <div>
           <p className="eyebrow">Snapshot</p>
           <h2>Open &amp; merged</h2>
-          <p>{connected ? 'Reported open and merged PR counts. Drafts and closed-unmerged PRs are excluded.' : 'Your snapshot will appear after connecting GitHub and completing a sync.'}</p>
+          <p>{connected ? 'Your authored PRs.' : 'Connect GitHub to see counts.'}</p>
         </div>
         <div className="donut-wrap" role="img" aria-label={`Reported PR counts: ${overview.openPullRequests} open, ${overview.mergedPullRequests ?? 0} merged`}>
           <div
