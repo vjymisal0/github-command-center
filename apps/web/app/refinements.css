@@ -4,6 +4,10 @@
   --chart-merged: #15803d;
   --accent: #b42363;
 }
+html[data-font="clean"] { --font-body: var(--font-sans); --font-display: var(--font-outfit), ui-sans-serif, sans-serif; }
+html[data-font="portfolio"] { --font-body: var(--font-mono); --font-display: var(--font-outfit), ui-sans-serif, sans-serif; }
+html[data-font="technical"] { --font-body: var(--font-sans); --font-display: var(--font-mono); }
+.font-picker { min-height: 34px; max-width: 104px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--text); padding: .35rem .5rem; font: 600 .75rem var(--font-sans); }
 body { line-height: 1.6; }
 h1 { letter-spacing: -.035em; }
 small, input, select, textarea { font-family: var(--font-body); }
