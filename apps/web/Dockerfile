@@ -4,7 +4,9 @@ RUN apk add --no-cache libc6-compat
 
 FROM base AS builder
 ARG NEXT_PUBLIC_API_URL=http://127.0.0.1:4000
+ARG API_INTERNAL_URL=http://api:4000
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV API_INTERNAL_URL=$API_INTERNAL_URL
 COPY package*.json ./
 COPY packages ./packages
 COPY apps/web ./apps/web
