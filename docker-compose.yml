@@ -41,7 +41,8 @@ services:
       GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
       GITHUB_OAUTH_CALLBACK_URL: ${GITHUB_OAUTH_CALLBACK_URL:-http://localhost:4100/auth/github/callback}
       GITHUB_WEBHOOK_SECRET: ${GITHUB_WEBHOOK_SECRET:-}
-      CREDENTIAL_ENCRYPTION_KEY: ${CREDENTIAL_ENCRYPTION_KEY:-0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef}
+      CREDENTIAL_ENCRYPTION_KEY: ${CREDENTIAL_ENCRYPTION_KEY:?set CREDENTIAL_ENCRYPTION_KEY to 64 hex characters}
+      ALLOW_REGISTRATION: ${ALLOW_REGISTRATION:-false}
     depends_on:
       postgres:
         condition: service_healthy
@@ -58,6 +59,7 @@ services:
       - "127.0.0.1:3100:3000"
     environment:
       NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:4100}
+      API_INTERNAL_URL: http://api:4000
       PUBLIC_WEB_URL: ${PUBLIC_WEB_URL:-http://localhost:3100}
     depends_on:
       - api
@@ -69,7 +71,7 @@ services:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-gcc}:${POSTGRES_PASSWORD:-gcc}@postgres:5432/${POSTGRES_DB:-gcc}
       REDIS_URL: redis://redis:6379
-      CREDENTIAL_ENCRYPTION_KEY: ${CREDENTIAL_ENCRYPTION_KEY:-0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef}
+      CREDENTIAL_ENCRYPTION_KEY: ${CREDENTIAL_ENCRYPTION_KEY:?set CREDENTIAL_ENCRYPTION_KEY to 64 hex characters}
     depends_on:
       postgres:
         condition: service_healthy

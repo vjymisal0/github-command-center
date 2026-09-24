@@ -80,6 +80,7 @@ const emptyOverview: OverviewStats = {
 };
 
 export const api = {
+  me: () => get<{ user: { id: string; email: string; name: string | null } | null }>('/auth/me', { user: null }),
   overview: () => get<OverviewStats>('/analytics/overview', emptyOverview),
   inbox: () => get<{ total: number; data: InboxItem[]; coverage: string }>('/inbox', { total: 0, data: [], coverage: 'not_connected' }),
   pullRequests: (query?: { search?: string; state?: string; ci?: string }) => {

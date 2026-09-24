@@ -28,7 +28,7 @@ export function ConnectedAccountsList({
 
     setRemovingId(id);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? 'http://127.0.0.1:4000'}/connections/${encodeURIComponent(id)}/delete`, {
+      const res = await fetch(`/api/connections/${encodeURIComponent(id)}/delete`, {
         method: 'POST',
       });
       if (res.ok) {
@@ -45,7 +45,7 @@ export function ConnectedAccountsList({
     // Direct form submit fallback guarantees cross-origin deletion succeeds
     const form = document.createElement('form');
     form.method = 'POST';
-    form.action = `${process.env.NEXT_PUBLIC_API_URL ?? 'http://127.0.0.1:4000'}/connections/${encodeURIComponent(id)}/delete`;
+    form.action = `/api/connections/${encodeURIComponent(id)}/delete`;
     document.body.appendChild(form);
     form.submit();
   }

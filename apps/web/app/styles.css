@@ -1,33 +1,29 @@
 :root {
   color-scheme: light;
-  --bg: #FFFCF6; /* Static warm off-white background */
-  --canvas: #FFFCF6;
-  --card: #FFFFFF;
-  --panel: #FFFFFF;
-  --text: #1C1917;
-  --ink: #1C1917;
-  --body: #44403C;
-  --muted: #78716C;
-  --muted-soft: #A8A29E;
-  --line: #E7E5E4;
-  --shadow-subtle: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
-  --shadow-card: 0 4px 6px -1px rgba(0, 0, 0, 0.03), 0 2px 4px -1px rgba(0, 0, 0, 0.02);
+  --bg: hsl(42 33% 97%);
+  --canvas: hsl(42 33% 97%);
+  --card: hsl(0 0% 100%);
+  --panel: hsl(0 0% 100%);
+  --text: hsl(222 35% 12%);
+  --ink: hsl(222 35% 12%);
+  --body: hsl(222 20% 24%);
+  --muted: hsl(222 12% 42%);
+  --muted-soft: hsl(222 10% 58%);
+  --line: hsl(222 16% 82%);
+  --shadow-subtle: 0 1px 3px hsl(222 35% 12% / 0.06);
+  --shadow-card: 0 8px 24px hsl(222 35% 12% / 0.08);
 
-  /* Accents */
-  --accent: #FF4081; /* Pink accent */
-  --pink-accent: #FF4081;
-  --pink-bg: #FFF0F5;
-  --purple-accent: #8E24AA;
-  --purple-bg: #F3E5F5;
-  --orange-accent: #FB8C00;
-  --orange-bg: #FFF3E0;
-  --green-accent: #43A047;
-  --green-bg: #E8F5E9;
+  --accent: hsl(17 85% 54%);
+  --pink-accent: hsl(221 70% 35%);
+  --pink-bg: hsl(221 70% 95%);
+  --purple-accent: hsl(221 70% 35%);
+  --purple-bg: hsl(221 70% 95%);
+  --orange-accent: hsl(17 85% 54%);
+  --orange-bg: hsl(17 85% 95%);
+  --green-accent: hsl(152 55% 35%);
+  --green-bg: hsl(152 55% 94%);
 
-  /* Typography */
-  --font-display: 'Cal Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-body: 'Nunito Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+  --font-body: var(--font-mono), ui-monospace, monospace;
 
   /* Status Badges */
   --badge-green-bg: #E8F5E9;
@@ -48,16 +44,16 @@
 
 [data-theme="dark"] {
   color-scheme: dark;
-  --bg: #14120F;
-  --canvas: #14120F;
-  --card: #1F1C18;
-  --panel: #1F1C18;
-  --text: #F5F5F4;
-  --ink: #F5F5F4;
-  --body: #D6D3D1;
-  --muted: #A8A29E;
-  --muted-soft: #78716C;
-  --line: #2E2A24;
+  --bg: hsl(222 47% 7%);
+  --canvas: hsl(222 47% 7%);
+  --card: hsl(0 0% 3%);
+  --panel: hsl(0 0% 3%);
+  --text: hsl(210 40% 96%);
+  --ink: hsl(210 40% 96%);
+  --body: hsl(210 30% 88%);
+  --muted: hsl(215 20% 65%);
+  --muted-soft: hsl(215 14% 50%);
+  --line: hsl(215 28% 22%);
   --shadow-subtle: 0 1px 3px rgba(0, 0, 0, 0.4);
   --shadow-card: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
 
@@ -87,7 +83,7 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--body);
-  font-family: var(--font-body);
+  font-family: var(--font-mono), ui-monospace, monospace;
   font-size: 15px;
   line-height: 1.55;
   letter-spacing: -0.01em;
@@ -122,6 +118,23 @@ code, pre, .mono, small, input, select, textarea, button.search, .card strong {
   letter-spacing: -0.03em;
   color: var(--ink);
 }
+
+.brand { text-decoration: none; display: flex; align-items: center; }
+.brand strong { color: var(--text); }
+.brand span { color: var(--pink-accent); }
+.navlinks { display: flex; gap: .4rem; align-items: center; flex: 1; }
+.navtools { display: flex; gap: .65rem; align-items: center; margin-left: auto; }
+.profile-menu { position: relative; }
+.avatar { width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--line); background: var(--card); color: var(--text); font-weight: 700; cursor: pointer; }
+.profile-popover { position: absolute; right: 0; top: calc(100% + 8px); width: 220px; padding: .5rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--card); box-shadow: var(--shadow-card); z-index: 200; }
+.profile-popover div { padding: .6rem; border-bottom: 1px solid var(--line); }
+.profile-popover small { display: block; color: var(--muted); overflow-wrap: anywhere; }
+.profile-popover a, .profile-popover button { display: block; width: 100%; padding: .65rem; border: 0; background: none; color: var(--text); text-align: left; text-decoration: none; cursor: pointer; font: inherit; }
+.auth-page { min-height: calc(100vh - 70px); display: grid; place-items: center; padding: 2rem; }
+.auth-card { width: min(100%, 430px); }
+.auth-card h1 { margin-bottom: .25rem; }
+.auth-card .login { margin-top: 1.25rem; }
+.text-button { border: 0; background: none; color: var(--pink-accent); padding: 1rem 0; cursor: pointer; font: inherit; font-weight: 700; }
 
 .topnav a {
   color: var(--muted);

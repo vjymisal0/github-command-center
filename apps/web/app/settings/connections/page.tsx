@@ -32,16 +32,11 @@ export default async function ConnectionsPage({
 
       {!hasAccounts && (
         <div className="connect-grid">
-          <a className="connect-card primary" href={`${process.env.NEXT_PUBLIC_API_URL ?? 'http://127.0.0.1:4000'}/auth/github`}>
-            <span>Browser authorization</span>
-            <strong>Sign in with GitHub</strong>
-            <p>Continue to GitHub to review access. OAuth requests broad repository permissions; use a fine-grained PAT for narrower access.</p>
-            <em>Continue with GitHub →</em>
-          </a>
-          <div className="connect-card">
-            <span>Manual fallback</span>
-            <strong>Personal Access Token</strong>
-            <p>Choose selected repositories and read-only permissions in GitHub, then enter your token below.</p>
+          <div className="connect-card primary">
+            <span>Recommended connection</span>
+            <strong>Fine-grained Personal Access Token</strong>
+            <p>Choose only the repositories you want tracked and grant read-only permissions, then enter the token below.</p>
+            <em>Your token is encrypted at rest.</em>
           </div>
         </div>
       )}

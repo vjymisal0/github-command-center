@@ -11,7 +11,7 @@ interface SyncJobData {
   connectionId: string;
 }
 
-export async function syncUserRepositoriesAndPRs(userId: string, token: string) {
+export async function syncUserRepositoriesAndPRs(userId: string, connectionId: string, token: string) {
   const octokit = new Octokit({ auth: token });
 
   // 1. Get authenticated user login
@@ -59,6 +59,7 @@ export async function syncUserRepositoriesAndPRs(userId: string, token: string) 
         create: {
           userId,
           repositoryId: dbRepo.id,
+          connectionId,
           relationships: [isOwner ? 'OWNED' : 'COLLABORATING'],
           status: 'active',
           lastVerifiedAt: new Date(),
@@ -166,7 +167,7 @@ export const worker = new Worker<SyncJobData>(
         tag: Buffer.from(encrypted.tag),
       });
 
-      await syncUserRepositoriesAndPRs(userId, token);
+      await syncUserRepositoriesAndPRs(userId, connectionId, token);
       console.log(`[Worker] Completed sync for user ${userId}`);
     } catch (err) {
       console.error(`[Worker] Error processing job ${job.id}:`, err);

@@ -56,8 +56,11 @@ model GitHubConnection {
   userId    String
   type      ConnectionType
   status    ConnectionStatus @default(ACTIVE)
+  githubUserId BigInt?
+  username  String?
   scopes    String[] @default([])
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
   user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
   credential EncryptedCredential?
   repositoryAccess UserRepositoryAccess[]
@@ -112,6 +115,10 @@ model PullRequest {
   mergedAt     DateTime?
   closedAt     DateTime?
   lastSyncedAt DateTime @default(now())
+  htmlUrl      String?
+  description  String?
+  ciStatus     String @default("UNKNOWN")
+  reviewStatus String @default("NONE")
   repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
   actionItems  ActionItem[]
   @@unique([repositoryId, number])
