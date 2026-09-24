@@ -9,7 +9,7 @@ COPY package*.json ./
 COPY packages ./packages
 COPY apps/web ./apps/web
 COPY tsconfig.json ./
-RUN npm install
+RUN npm ci --no-audit --fund=false
 RUN rm -f packages/shared/tsconfig.tsbuildinfo && npm run build -w packages/shared
 RUN npm run build -w apps/web
 

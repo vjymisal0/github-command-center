@@ -7,7 +7,7 @@ COPY package*.json ./
 COPY packages ./packages
 COPY apps/worker ./apps/worker
 COPY tsconfig.json ./
-RUN npm install
+RUN npm ci --no-audit --fund=false
 RUN npx prisma generate --schema packages/database/prisma/schema.prisma
 RUN rm -f packages/shared/tsconfig.tsbuildinfo && npm run build -w packages/shared
 RUN npm run build -w apps/worker
