@@ -85,8 +85,12 @@ test('logout invalidates the server-side session', async () => {
   assert.equal(protectedResponse.statusCode, 401);
 });
 
-test('login does not auto-register unknown users', async () => {
-  const response = await app.inject({ method: 'POST', url: '/auth/login', payload: { email: `unknown-${suffix}@example.com`, password: 'correct-horse-battery-staple' } });
+test('registration treats email casing consistently', async () => {
+  const response = await app.inject({ method: 'POST', url: '/auth/register', payload: { email: `A-${suffix}@EXAMPLE.COM`, password: 'correct-horse-battery-staple' } });
+  assert.equal(response.statusCode, 409);
+});
+
+test('login does not auto-register unknown users', async () => {  const response = await app.inject({ method: 'POST', url: '/auth/login', payload: { email: `unknown-${suffix}@example.com`, password: 'correct-horse-battery-staple' } });
   assert.equal(response.statusCode, 401);
 });
 

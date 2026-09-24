@@ -116,8 +116,9 @@ export async function buildApp(opts: { logger?: boolean } = {}) {
     const body = credentialsBody.parse(request.body);
     const allowRegistration = process.env.ALLOW_REGISTRATION === 'true' || (await prisma.user.count()) === 0;
     if (!allowRegistration) return reply.code(403).send({ error: 'Registration is disabled' });
-    if (await prisma.user.findUnique({ where: { email: body.email } })) return reply.code(409).send({ error: 'Account already exists' });
-    const user = await prisma.user.create({ data: { email: body.email.toLowerCase(), name: body.email.split('@')[0], passwordHash: hashPassword(body.password) } });
+    const email = body.email.toLowerCase();
+    if (await prisma.user.findUnique({ where: { email } })) return reply.code(409).send({ error: 'Account already exists' });
+    const user = await prisma.user.create({ data: { email, name: email.split('@')[0], passwordHash: hashPassword(body.password) } });
     const sid = randomUUID();
     await prisma.session.create({ data: { id: sid, userId: user.id, expiresAt: new Date(Date.now() + 30 * 86400000) } });
     sessionCookie(reply, sid);

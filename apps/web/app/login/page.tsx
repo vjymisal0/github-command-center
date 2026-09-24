@@ -26,7 +26,7 @@ export default function LoginPage() {
         <label>Email<input name="email" type="email" autoComplete="email" required /></label>
         <label>Password<input name="password" type="password" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} minLength={12} required /></label>
         {error && <div className="notice danger" role="alert">{error}</div>}
-        <button className="button" disabled={loading}>{loading ? 'Please wait…' : mode === 'login' ? 'Sign in' : 'Create account'}</button>
+        <button className="button" type="submit" disabled={loading}>{loading ? 'Please wait…' : mode === 'login' ? 'Sign in' : 'Create account'}</button>
       </form>
       <button className="text-button" type="button" onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError(''); }}>
         {mode === 'login' ? 'First-time setup? Create account' : 'Already have an account? Sign in'}

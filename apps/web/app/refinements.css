@@ -39,5 +39,8 @@ small, input, select, textarea { font-family: var(--font-body); }
   .overview-panel { padding: 1.25rem; }
   .donut-wrap { gap: 1rem; }
   .filters > * { width: 100%; }
-  .topnav { flex-wrap: wrap; }
+  .topnav { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .65rem; overflow: visible; }
+  .navlinks { grid-column: 1 / -1; width: 100%; overflow-x: auto; white-space: nowrap; scrollbar-width: none; }
+  .navlinks::-webkit-scrollbar { display: none; }
+  .navtools { margin-left: 0; }
 }
