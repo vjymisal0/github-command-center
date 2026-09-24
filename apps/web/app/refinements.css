@@ -4,9 +4,23 @@
   --chart-merged: #15803d;
   --accent: #b42363;
 }
-body { line-height: 1.6; }
-h1 { letter-spacing: -.035em; }
+body { font-size: 16px; line-height: 1.62; letter-spacing: -.012em; }
+h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 600; }
+h1 { font-size: clamp(2.35rem, 5vw, 4rem); line-height: 1.02; letter-spacing: -.055em; }
+h2 { font-size: clamp(1.25rem, 2vw, 1.55rem); line-height: 1.15; letter-spacing: -.035em; }
+h3 { font-size: 1.05rem; line-height: 1.25; letter-spacing: -.02em; }
+p { font-size: .975rem; }
 small, input, select, textarea { font-family: var(--font-body); }
+small { font-size: .78rem; }
+.topnav a { font-size: .84rem; letter-spacing: -.01em; }
+.eyebrow { font: 600 .7rem/1.2 var(--font-mono); letter-spacing: .12em; }
+.button, .filter-chip { font-size: .82rem; letter-spacing: .005em; }
+.metric-value { font-size: clamp(2rem, 4vw, 2.7rem); letter-spacing: -.055em; }
+.metric-label, .results-count { font-size: .78rem; }
+.row strong { font-size: .94rem; letter-spacing: -.012em; }
+.row small { font-size: .78rem; line-height: 1.45; }
+.overview-hero h1 { font-size: clamp(2.5rem, 6vw, 4.6rem); line-height: .98; letter-spacing: -.065em; }
+.pageHeader h1 { font-size: clamp(2rem, 4vw, 3.25rem); }
 .metric-value, .donut span, .donut-legend strong { font-variant-numeric: tabular-nums; }
 :where(a, button, input, select, summary):focus-visible { outline: 3px solid var(--chart-open); outline-offset: 4px; }
 .metric-card:hover, .card:hover, .row:hover { transform: none; box-shadow: var(--shadow-subtle); }
