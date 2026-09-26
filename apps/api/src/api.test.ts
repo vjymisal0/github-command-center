@@ -51,7 +51,7 @@ test('anonymous data requests are rejected', async () => {
   assert.equal(response.statusCode, 401);
 });
 
-test('GitHub login requests only profile and verified-email scopes', async () => {
+test('GitHub login requests only identity scopes', async () => {
   const previous = process.env.GITHUB_CLIENT_ID;
   process.env.GITHUB_CLIENT_ID = 'test-client';
   try {

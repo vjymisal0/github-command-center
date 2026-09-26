@@ -1,0 +1,1 @@
+ALTER TYPE "ConnectionType" ADD VALUE IF NOT EXISTS 'OAUTH';

@@ -9,6 +9,7 @@ datasource db {
 
 enum ConnectionType {
   GITHUB_APP
+  OAUTH
   PAT
 }
 
