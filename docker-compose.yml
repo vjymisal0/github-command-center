@@ -3,7 +3,7 @@ services:
     image: postgres:17-alpine
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-gcc}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gcc}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?required}
       POSTGRES_DB: ${POSTGRES_DB:-gcc}
     ports:
       - "127.0.0.1:5432:5432"
@@ -32,16 +32,16 @@ services:
     ports:
       - "127.0.0.1:4100:4000"
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-gcc}:${POSTGRES_PASSWORD:-gcc}@postgres:5432/${POSTGRES_DB:-gcc}
+      DATABASE_URL: ${DATABASE_URL:?required}
       REDIS_URL: redis://redis:6379
-      SESSION_SECRET: ${SESSION_SECRET:-super-secret-production-key-change-me}
+      SESSION_SECRET: ${SESSION_SECRET:?required}
       PUBLIC_WEB_URL: ${PUBLIC_WEB_URL:-http://localhost:3100}
       PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:4100}
       GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
       GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
       GITHUB_OAUTH_CALLBACK_URL: ${GITHUB_OAUTH_CALLBACK_URL:-http://localhost:3100/api/auth/github/callback}
       GITHUB_WEBHOOK_SECRET: ${GITHUB_WEBHOOK_SECRET:-}
-      CREDENTIAL_ENCRYPTION_KEY: ${CREDENTIAL_ENCRYPTION_KEY:?set CREDENTIAL_ENCRYPTION_KEY to 64 hex characters}
+      CREDENTIAL_ENCRYPTION_KEY: ${CREDENTIAL_ENCRYPTION_KEY:?required}
       ALLOW_REGISTRATION: ${ALLOW_REGISTRATION:-false}
     command: ["sh", "-c", "npm run db:migrate && npm run start -w apps/api"]
     depends_on:
@@ -63,17 +63,28 @@ services:
       NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:4100}
       API_INTERNAL_URL: http://api:4000
       PUBLIC_WEB_URL: ${PUBLIC_WEB_URL:-http://localhost:3100}
+      DATABASE_URL: ${DATABASE_URL:?required}
+      REDIS_URL: redis://redis:6379
+      SESSION_SECRET: ${SESSION_SECRET:?required}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      GITHUB_OAUTH_CALLBACK_URL: ${GITHUB_OAUTH_CALLBACK_URL:-http://localhost:3100/api/auth/github/callback}
+      GITHUB_WEBHOOK_SECRET: ${GITHUB_WEBHOOK_SECRET:-}
+      CREDENTIAL_ENCRYPTION_KEY: ${CREDENTIAL_ENCRYPTION_KEY:?required}
+      ALLOW_REGISTRATION: ${ALLOW_REGISTRATION:-false}
     depends_on:
       - api
+      - postgres
+      - redis
 
   worker:
     build:
       context: .
       dockerfile: apps/worker/Dockerfile
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-gcc}:${POSTGRES_PASSWORD:-gcc}@postgres:5432/${POSTGRES_DB:-gcc}
+      DATABASE_URL: ${DATABASE_URL:?required}
       REDIS_URL: redis://redis:6379
-      CREDENTIAL_ENCRYPTION_KEY: ${CREDENTIAL_ENCRYPTION_KEY:?set CREDENTIAL_ENCRYPTION_KEY to 64 hex characters}
+      CREDENTIAL_ENCRYPTION_KEY: ${CREDENTIAL_ENCRYPTION_KEY:?required}
     depends_on:
       postgres:
         condition: service_healthy

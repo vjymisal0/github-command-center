@@ -21,6 +21,7 @@ const production = process.env.NODE_ENV === 'production';
 const listQuery = z.object({ search: z.string().max(200).optional(), state: z.string().optional(), ci: z.string().optional(), visibility: z.string().optional(), relationship: z.string().optional() });
 const credentialsBody = z.object({ email: z.string().email(), password: z.string().min(6).max(200) });
 const patBody = z.object({ token: z.string().min(20).max(500) });
+const githubOAuthScopes = process.env.GITHUB_OAUTH_SCOPES ?? 'read:user user:email';
 
 type AuthUser = { id: string; email: string; name: string | null };
 
@@ -44,6 +45,22 @@ function sessionCookie(reply: FastifyReply, id: string) {
 function contains(value: string, needle = '') { return value.toLowerCase().includes(needle.toLowerCase()); }
 function relationLabel(values: string[]) { return values.includes('OWNED') ? 'Owned' : values.includes('COLLABORATING') ? 'Collaborating' : 'External contribution'; }
 function publicUser(user: AuthUser) { return { id: user.id, email: user.email, name: user.name }; }
+
+async function storeGitHubCredential(userId: string, connectionId: string, token: string, githubUser: { id: number; login: string }, type: 'OAUTH' | 'PAT', scopes: string[]) {
+  const encrypted = encryptCredential(token);
+  await prisma.$transaction(async tx => {
+    await tx.gitHubConnection.upsert({
+      where: { id: connectionId },
+      update: { status: 'ACTIVE', username: githubUser.login, githubUserId: BigInt(githubUser.id), type, scopes },
+      create: { id: connectionId, userId, type, status: 'ACTIVE', username: githubUser.login, githubUserId: BigInt(githubUser.id), scopes },
+    });
+    await tx.encryptedCredential.upsert({
+      where: { connectionId },
+      update: { keyVersion: encrypted.keyVersion, ciphertext: new Uint8Array(encrypted.ciphertext), nonce: new Uint8Array(encrypted.nonce), tag: new Uint8Array(encrypted.tag) },
+      create: { connectionId, keyVersion: encrypted.keyVersion, ciphertext: new Uint8Array(encrypted.ciphertext), nonce: new Uint8Array(encrypted.nonce), tag: new Uint8Array(encrypted.tag) },
+    });
+  });
+}
 
 async function requireEncryptionKey() {
   if (production && !/^[a-f0-9]{64}$/i.test(process.env.CREDENTIAL_ENCRYPTION_KEY ?? '')) throw new Error('CREDENTIAL_ENCRYPTION_KEY must be a 64-character hex value in production');
@@ -163,7 +180,7 @@ export async function buildApp(opts: { logger?: boolean } = {}) {
     const state = randomBytes(24).toString('hex');
     reply.setCookie('oauth_state', state, { httpOnly: true, sameSite: 'lax', secure: production, path: '/', maxAge: 600 });
     const callback = process.env.GITHUB_OAUTH_CALLBACK_URL ?? `${webUrl}/api/auth/github/callback`;
-    const params = new URLSearchParams({ client_id: clientId, redirect_uri: callback, scope: 'read:user user:email', state });
+    const params = new URLSearchParams({ client_id: clientId, redirect_uri: callback, scope: githubOAuthScopes, state });
     return reply.redirect(`https://github.com/login/oauth/authorize?${params}`);
   });
   app.get('/auth/github/callback', async (request, reply) => {
@@ -189,6 +206,9 @@ export async function buildApp(opts: { logger?: boolean } = {}) {
     user = user
       ? await prisma.user.update({ where: { id: user.id }, data: { githubUserId: BigInt(github.id), githubLogin: github.login, name: user.name ?? github.name ?? github.login } })
       : await prisma.user.create({ data: { email: normalizedEmail, name: github.name ?? github.login, githubUserId: BigInt(github.id), githubLogin: github.login } });
+    const connectionId = `oauth_${user.id}_${github.id}`;
+    await storeGitHubCredential(user.id, connectionId, tokenBody.access_token, { id: github.id, login: github.login }, 'OAUTH', githubOAuthScopes.split(/\s+/).filter(Boolean));
+    void syncGitHubData(user.id, connectionId, tokenBody.access_token, request.log).catch(error => request.log.error({ error, userId: user.id, connectionId }, 'GitHub OAuth sync failed'));
     const sid = randomUUID();
     await prisma.session.create({ data: { id: sid, userId: user.id, expiresAt: new Date(Date.now() + 30 * 86400000) } });
     sessionCookie(reply, sid);
@@ -221,7 +241,7 @@ export async function buildApp(opts: { logger?: boolean } = {}) {
   app.get('/connections', async request => {
     const connections = await prisma.gitHubConnection.findMany({ where: { userId: request.authUser!.id, status: 'ACTIVE' }, select: { id: true, type: true, username: true } });
     const accounts = connections.map(c => ({ id: c.id, username: c.username ?? 'GitHub user' }));
-    return { data: [{ type: 'PAT (Personal Access Token)', status: accounts.length ? `${accounts.length} connected` : 'Not configured', coverage: 'Current active mode', description: 'Read-only GitHub synchronization.', webhook: false, accounts: accounts.map(a => `@${a.username}`), accountItems: accounts }], connectedCount: accounts.length, permissionChecklist: ['Repository metadata (Read)', 'Pull requests (Read)', 'Commit statuses (Read)', 'Checks (Read)'] };
+    return { data: [{ type: 'GitHub account', status: accounts.length ? `${accounts.length} connected` : 'Not configured', coverage: 'Current active mode', description: 'GitHub synchronization.', webhook: false, accounts: accounts.map(a => `@${a.username}`), accountItems: accounts }], connectedCount: accounts.length, permissionChecklist: ['Repository metadata', 'Pull requests', 'Commit statuses', 'Checks'] };
   });
   app.post('/connections/pat/test', async request => { const { token } = patBody.parse(request.body); const { data: user } = await new Octokit({ auth: token }).rest.users.getAuthenticated(); return { ok: true, githubUser: { id: user.id, login: user.login, avatarUrl: user.avatar_url } }; });
   app.post('/connections/pat', async (request, reply) => {
@@ -232,14 +252,7 @@ export async function buildApp(opts: { logger?: boolean } = {}) {
     let ghUser;
     try { ghUser = (await octokit.rest.users.getAuthenticated()).data; } catch { return reply.code(401).send({ error: 'GitHub token validation failed' }); }
     const id = `pat_${userId}_${ghUser.id}`;
-    const encrypted = encryptCredential(token);
-    await prisma.$transaction(async tx => {
-      await tx.gitHubConnection.upsert({ where: { id }, update: { status: 'ACTIVE', username: ghUser.login, githubUserId: BigInt(ghUser.id) }, create: { id, userId, type: 'PAT', status: 'ACTIVE', username: ghUser.login, githubUserId: BigInt(ghUser.id), scopes: [] } });
-      const ciphertext = new Uint8Array(encrypted.ciphertext);
-      const nonce = new Uint8Array(encrypted.nonce);
-      const tag = new Uint8Array(encrypted.tag);
-      await tx.encryptedCredential.upsert({ where: { connectionId: id }, update: { keyVersion: encrypted.keyVersion, ciphertext, nonce, tag }, create: { connectionId: id, keyVersion: encrypted.keyVersion, ciphertext, nonce, tag } });
-    });
+    await storeGitHubCredential(userId, id, token, { id: ghUser.id, login: ghUser.login }, 'PAT', []);
     void syncGitHubData(userId, id, token, request.log).catch(error => request.log.error({ error, userId, connectionId: id }, 'GitHub sync failed'));
     return reply.code(202).send({ ok: true, state: 'syncing', user: { login: ghUser.login, id: ghUser.id } });
   });
@@ -317,15 +330,16 @@ export async function buildApp(opts: { logger?: boolean } = {}) {
     const where = scopedPrWhere(userId);
     const usernames = await connectedUsernames(userId);
     const authored = { ...where, authorLogin: { in: usernames } };
-    const [openPullRequests, mergedPullRequests, repositories, actionItems, failingChecks, last] = await Promise.all([
+    const [openPullRequests, mergedPullRequests, repositories, actionItems, failingChecks, last, activeConnections] = await Promise.all([
       prisma.pullRequest.count({ where: { ...authored, state: 'OPEN' } }),
       prisma.pullRequest.count({ where: { ...authored, state: 'MERGED' } }),
       prisma.repository.count({ where: { userAccess: { some: { userId, status: 'active', relationships: { hasSome: ['OWNED', 'COLLABORATING'] } } } } }),
       prisma.actionItem.count({ where: { userId, resolvedAt: null, pullRequest: where } }),
       prisma.pullRequest.count({ where: { ...where, ciStatus: 'FAILING' } }),
       prisma.userRepositoryAccess.findFirst({ where: { userId, status: 'active' }, orderBy: { lastVerifiedAt: 'desc' } }),
+      prisma.gitHubConnection.count({ where: { userId, status: 'ACTIVE' } }),
     ]);
-    return { openPullRequests, mergedPullRequests, actionItems, failingChecks, repositories, lastSuccessfulSync: last?.lastVerifiedAt?.toISOString() ?? null, coverage: repositories ? 'live' : 'not_connected' };
+    return { openPullRequests, mergedPullRequests, actionItems, failingChecks, repositories, lastSuccessfulSync: last?.lastVerifiedAt?.toISOString() ?? null, coverage: activeConnections ? 'live' : 'not_connected' };
   });
   app.post('/webhooks/github', async (_request, reply) => reply.code(501).send({ error: 'Webhooks are disabled until raw-body signature verification is configured; use reconciliation sync.' }));
   app.setErrorHandler((error, _request, reply) => { if (error instanceof z.ZodError) return reply.code(400).send({ error: 'Invalid request', details: error.flatten() }); app.log.error(error); const failure = error as Error & { statusCode?: number }; return reply.code(failure.statusCode ?? 500).send({ error: failure.statusCode ? failure.message : 'Internal server error' }); });

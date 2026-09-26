@@ -8,7 +8,9 @@
     "typecheck": "tsc -b",
     "test": "tsx --test packages/shared/src/*.test.ts apps/api/src/*.test.ts",
     "db:generate": "prisma generate --schema packages/database/prisma/schema.prisma",
-    "db:migrate": "prisma migrate deploy --schema packages/database/prisma/schema.prisma"
+    "db:migrate": "prisma migrate deploy --schema packages/database/prisma/schema.prisma",
+    "postinstall": "npm run db:generate",
+    "vercel-build": "npm run build -w packages/shared && npm run build -w apps/web"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

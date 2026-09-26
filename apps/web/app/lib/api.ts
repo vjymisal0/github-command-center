@@ -1,6 +1,12 @@
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 
-const apiBase = process.env.API_INTERNAL_URL ?? process.env.NEXT_PUBLIC_API_URL ?? 'http://127.0.0.1:4000';
+async function apiBase() {
+  if (process.env.API_INTERNAL_URL || process.env.NEXT_PUBLIC_API_URL) return process.env.API_INTERNAL_URL ?? process.env.NEXT_PUBLIC_API_URL!;
+  const h = await headers();
+  const proto = h.get('x-forwarded-proto') ?? 'http';
+  const host = h.get('host') ?? '127.0.0.1:3000';
+  return `${proto}://${host}/api`;
+}
 
 export interface OverviewStats {
   openPullRequests: number;
@@ -58,7 +64,7 @@ export interface ConnectionsResponse {
 async function get<T>(path: string, fallback: T): Promise<T> {
   try {
     const cookieHeader = (await cookies()).toString();
-    const res = await fetch(`${apiBase}${path}`, {
+    const res = await fetch(`${await apiBase()}${path}`, {
       cache: 'no-store',
       headers: cookieHeader ? { cookie: cookieHeader } : undefined,
     });

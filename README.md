@@ -10,6 +10,7 @@ A self-hosted, read-only GitHub command center for repositories, pull requests, 
 - Read-only PR and repository explorers
 - Light and dark themes
 - Docker Compose deployment with PostgreSQL, Redis, API, web, and worker services
+- Vercel/Netlify web deployment with bundled API routes
 - GitHub webhook endpoint and scheduled sync foundation
 
 ## Local development
@@ -39,21 +40,36 @@ The host-mode web app runs on `http://localhost:3000`; the API runs on `http://l
 
 ## Production deployment
 
+### Docker/VM
+
 ```bash
 cp .env.example .env
 # Set strong secrets and public URLs in .env
 docker compose up -d --build
 ```
 
-Put Caddy, Nginx, or another HTTPS reverse proxy in front of web and API. Keep PostgreSQL and Redis private. For OAuth, configure the GitHub OAuth App callback as:
+Put Caddy, Nginx, or another HTTPS reverse proxy in front of the web service. Keep PostgreSQL and Redis private.
+
+### Vercel or Netlify
+
+Deploy the repo root. The Next.js app in `apps/web` also serves the API at `/api/*`, so no separate Fastify server is required.
+
+Set these environment variables on the platform:
 
 ```text
-https://your-domain.example/auth/github/callback
+DATABASE_URL=postgresql://...
+PUBLIC_WEB_URL=https://your-domain.example
+GITHUB_OAUTH_CALLBACK_URL=https://your-domain.example/api/auth/github/callback
+SESSION_SECRET=...
+CREDENTIAL_ENCRYPTION_KEY=<64 hex characters>
+ALLOW_REGISTRATION=false
+GITHUB_CLIENT_ID=...
+GITHUB_CLIENT_SECRET=...
 ```
 
-Required production variables include `PUBLIC_WEB_URL`, `PUBLIC_API_URL`, `SESSION_SECRET`, and a randomly generated 64-hex-character `CREDENTIAL_ENCRYPTION_KEY`. Keep registration disabled by default. GitHub OAuth variables are reserved for a future verified OAuth flow; the current secure connection flow uses a fine-grained PAT.
+Run `npm run db:migrate` against the production database before the first deploy and after schema changes. Use hosted Postgres; serverless platforms do not run the bundled Docker PostgreSQL/Redis services.
 
-The API applies Prisma migrations before startup. Back up PostgreSQL before upgrades. A lost credential-encryption key cannot be recovered; rotate it only with a deliberate credential reconnection or re-encryption procedure.
+The API applies Prisma migrations in Docker only. Back up PostgreSQL before upgrades. A lost credential-encryption key cannot be recovered; rotate it only with a deliberate credential reconnection or re-encryption procedure.
 
 ## Scope
 
